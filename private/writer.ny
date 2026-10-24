@@ -35,6 +35,13 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     if n.is_unsigned { return handler.UInt64(n.unsigned_value); }
     return handler.Int64(n.value);
   }
+  if node.node.holds<JsonNumber>() {
+    let number: JsonNumber? = node.node.get_if<JsonNumber>();
+    if number == nil { return handler.Null(); }
+    let raw: string = json_scratch_copy(scratch, (number as JsonNumber).value);
+    if raw.length != (number as JsonNumber).value.length { return false; }
+    return handler.Number(raw);
+  }
   if node.node.holds<JsonStr>() {
     let sv: JsonStr? = node.node.get_if<JsonStr>();
     if sv == nil {
@@ -125,6 +132,14 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
     let n: JsonInt = iv as JsonInt;
     if n.is_unsigned { return handler.UInt64(n.unsigned_value); }
     return handler.Int64(n.value);
+  }
+  if self.node.holds<JsonNumber>() {
+    let number: JsonNumber? = self.node.get_if<JsonNumber>();
+    if number == nil { return handler.Null(); }
+    let value: string = (number as JsonNumber).value;
+    let raw: string = json_scratch_copy(scratch, value);
+    if raw.length != value.length { return false; }
+    return handler.Number(raw);
   }
   if self.node.holds<JsonStr>() {
     let sv: JsonStr? = self.node.get_if<JsonStr>();
@@ -277,6 +292,19 @@ pub method(JsonWriter) UInt64(v: uint64) -> bool {
   if self.st == (ptr<int8>.null()) { return false; }
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
   return json_dom_add_value(sp, JsonFromUInt64(v));
+}
+
+pub method(JsonWriter) Number(raw: string) -> bool {
+  if self.st == (ptr<int8>.null()) || !json_number_is_valid(raw) { return false; }
+  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  unsafe {
+    let heap_raw: string = json_durable_copy((*sp).durable, raw);
+    if (raw.length > 0) && (heap_raw.length <= 0) {
+      (*sp).failed = true;
+      return false;
+    }
+    return json_dom_add_value(sp, Json{ node: JsonNumber{ value: heap_raw } });
+  }
 }
 
 pub method(JsonWriter) String(s: string) -> bool {

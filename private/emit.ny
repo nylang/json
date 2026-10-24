@@ -194,6 +194,13 @@ func json_trees_equal(a: Json, b: Json) -> bool {
     if aiv.is_unsigned { return aiv.unsigned_value == biv.unsigned_value; }
     return aiv.value == biv.value;
   }
+  if a.node.holds<JsonNumber>() {
+    if !b.node.holds<JsonNumber>() { return false; }
+    let an: JsonNumber? = a.node.get_if<JsonNumber>();
+    let bn: JsonNumber? = b.node.get_if<JsonNumber>();
+    if an == nil || bn == nil { return false; }
+    return (an as JsonNumber).value == (bn as JsonNumber).value;
+  }
   if a.node.holds<JsonStr>() {
     if !b.node.holds<JsonStr>() {
       return false;
@@ -338,6 +345,11 @@ method(JsonEmitter) EmitJson(node: Json) -> void {
       if n.is_unsigned { self.buf.Append(json_u64_text(n.unsigned_value)); }
       else { self.buf.Append(json_i64_text(n.value)); }
     }
+    return;
+  }
+  if node.node.holds<JsonNumber>() {
+    let number: JsonNumber? = node.node.get_if<JsonNumber>();
+    if number != nil { self.buf.Append((number as JsonNumber).value); }
     return;
   }
   if node.node.holds<JsonStr>() {

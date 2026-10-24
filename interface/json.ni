@@ -17,6 +17,7 @@ pub interface JsonHandler {
   Bool(b: bool) -> bool;
   Int64(v: int64) -> bool;
   UInt64(v: uint64) -> bool;
+  Number(raw: string) -> bool;
   String(s: string) -> bool;
   StartObject() -> bool;
   Key(k: string) -> bool;
@@ -123,6 +124,7 @@ pub method(JsonWriter) Null() -> bool;
 pub method(JsonWriter) Bool(b: bool) -> bool;
 pub method(JsonWriter) Int64(v: int64) -> bool;
 pub method(JsonWriter) UInt64(v: uint64) -> bool;
+pub method(JsonWriter) Number(raw: string) -> bool;
 pub method(JsonWriter) String(s: string) -> bool;
 pub method(JsonWriter) StartObject() -> bool;
 pub method(JsonWriter) Key(k: string) -> bool;
@@ -152,6 +154,12 @@ pub struct JsonBool { value: bool; }
 pub struct JsonInt { value: int64; unsigned_value: uint64; is_unsigned: bool; }
 
 /**
+ * @brief Exact JSON number lexeme used for fractions, exponents, and integers outside uint64.
+ * @note Preserves the original spelling so parse/emit does not lose precision.
+ */
+pub struct JsonNumber { value: string; }
+
+/**
  * @brief JSON string (UTF-8; escapes decoded). Arm 3.
  */
 pub struct JsonStr { value: string; }
@@ -176,7 +184,7 @@ pub struct JsonObject { entries: Array<JsonObjectEntry>; }
  * @note json.md §1.3 escape hatch: `struct Json { node: variant<…> }` because recursive
  *       `typedef Json = variant<…>` through `Array<Json>` is rejected. Do not rename to JsonNode.
  */
-pub struct Json { node: variant<JsonNull, JsonBool, JsonInt, JsonStr, JsonArray, JsonObject>; }
+pub struct Json { node: variant<JsonNull, JsonBool, JsonInt, JsonNumber, JsonStr, JsonArray, JsonObject>; }
 
 /**
  * @brief Parse or I/O failure from this library (not a compiler `NYxxxx`).
@@ -230,6 +238,7 @@ pub method(JsonStr) Text() -> string;
  * @brief Integer scalar payload.
  */
 pub method(JsonInt) I64() -> int64;
+pub method(JsonNumber) Text() -> string;
 
 /**
  * @brief Bool scalar payload.
@@ -238,6 +247,7 @@ pub method(JsonBool) Value() -> bool;
 
 pub func JsonAsInt(doc: Json) -> int64?;
 pub func JsonAsUInt64(doc: Json) -> uint64?;
+pub func JsonAsNumber(doc: Json) -> string?;
 pub func JsonAsBool(doc: Json) -> bool?;
 pub func JsonAsStr(doc: Json) -> string?;
 pub func JsonAsObject(doc: Json) -> JsonObject?;
@@ -252,6 +262,7 @@ pub func JsonIsNull(doc: Json) -> bool;
 pub func JsonFromBool(v: bool) -> Json;
 pub func JsonFromInt(v: int64) -> Json;
 pub func JsonFromUInt64(v: uint64) -> Json;
+pub func JsonFromNumber(raw: string) -> Json?;
 pub func JsonFromStr(s: string) -> Json;
 pub func JsonFromArray(items: Array<Json>) -> Json;
 pub func JsonFromObject(entries: Array<JsonObjectEntry>) -> Json;

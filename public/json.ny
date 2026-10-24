@@ -97,6 +97,11 @@ pub method(JsonInt) I64() -> int64 {
   return self.value;
 }
 
+/** @brief Exact source spelling of a JSON number not represented by integer arms. */
+pub method(JsonNumber) Text() -> string {
+  return copy(self.value);
+}
+
 /**
  * @brief Bool scalar payload.
  */
@@ -127,6 +132,17 @@ pub func JsonAsUInt64(doc: Json) -> uint64? {
     if signed >= 0 as int64 { return signed as uint64; }
   }
   return nil;
+}
+
+/** Return the exact JSON number text for integer and non-integer number nodes. */
+pub func JsonAsNumber(doc: Json) -> string? {
+  let raw: JsonNumber? = doc.node.get_if<JsonNumber>();
+  if raw != nil { return copy((raw as JsonNumber).value); }
+  let integer: JsonInt? = doc.node.get_if<JsonInt>();
+  if integer == nil { return nil; }
+  let value: JsonInt = integer as JsonInt;
+  if value.is_unsigned { return json_u64_text(value.unsigned_value); }
+  return json_i64_text(value.value);
 }
 
 /**
@@ -191,6 +207,12 @@ pub func JsonFromInt(v: int64) -> Json {
 pub func JsonFromUInt64(v: uint64) -> Json {
   if v <= 9223372036854775807u64 { return JsonFromInt(v as int64); }
   return Json{ node: JsonInt{ value: 0 as int64, unsigned_value: v, is_unsigned: true } };
+}
+
+/** Construct a number from valid JSON numeric syntax; preserve its exact spelling. */
+pub func JsonFromNumber(raw: string) -> Json? {
+  if !json_number_is_valid(raw) { return nil; }
+  return Json{ node: JsonNumber{ value: copy(raw) } };
 }
 
 /**

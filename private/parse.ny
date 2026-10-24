@@ -1,7 +1,7 @@
 /**
  * @brief JSON recursive-descent SAX parse → JsonHandler events (m_v0.19_p1).
  * @note Key/String payloads are copied into `scratch` (MemStack/MemArena as Allocator).
- * @note Empty input is a Parse error (json.md §0.4). No floats/comments/trailing commas in v1.
+ * @note Empty input is a Parse error (json.md §0.4). Comments and trailing commas are rejected.
  * @see docs/design/stdlib/json.md §0.3–1.4
  */
 part of JsonTypes;
@@ -229,6 +229,53 @@ func json_parse_u64(s: string) -> JsonU64Parse {
   out.value = magnitude;
   out.ok = true;
   return out;
+}
+
+/** Validate the RFC 8259 number grammar without converting or rounding the value. */
+func json_number_is_valid(s: string) -> bool {
+  let n: int32 = s.length;
+  if n <= 0 { return false; }
+  var i: int32 = 0;
+  if json_byte_at(s, i) == 45 { i = i + 1; }
+  if i >= n { return false; }
+  let first: int32 = json_byte_at(s, i);
+  if first == 48 {
+    i = i + 1;
+    if i < n {
+      let next: int32 = json_byte_at(s, i);
+      if (next >= 48) && (next <= 57) { return false; }
+    }
+  } else {
+    if (first < 49) || (first > 57) { return false; }
+    i = i + 1;
+    while i < n {
+      let b: int32 = json_byte_at(s, i);
+      if (b < 48) || (b > 57) { break; }
+      i = i + 1;
+    }
+  }
+  if i < n && json_byte_at(s, i) == 46 {
+    i = i + 1;
+    let fraction_start: int32 = i;
+    while i < n {
+      let b: int32 = json_byte_at(s, i);
+      if (b < 48) || (b > 57) { break; }
+      i = i + 1;
+    }
+    if i == fraction_start { return false; }
+  }
+  if i < n && ((json_byte_at(s, i) == 101) || (json_byte_at(s, i) == 69)) {
+    i = i + 1;
+    if i < n && ((json_byte_at(s, i) == 43) || (json_byte_at(s, i) == 45)) { i = i + 1; }
+    let exponent_start: int32 = i;
+    while i < n {
+      let b: int32 = json_byte_at(s, i);
+      if (b < 48) || (b > 57) { break; }
+      i = i + 1;
+    }
+    if i == exponent_start { return false; }
+  }
+  return i == n;
 }
 
 func json_keys_has(keys: *mut Array<string>, key: string) -> bool {
@@ -494,9 +541,7 @@ method(JsonParseCtx) ParseNumber() -> bool {
   let start: int32 = self.pos;
   let start_line: int32 = self.line;
   let start_col: int32 = self.column;
-  if self.Peek() == 45 {
-    self.Advance();
-  }
+  if self.Peek() == 45 { self.Advance(); }
   let first: int32 = self.Peek();
   if (first < 48) || (first > 57) {
     self.FailAt(start_line, start_col, "invalid number");
@@ -504,25 +549,63 @@ method(JsonParseCtx) ParseNumber() -> bool {
   }
   if first == 48 {
     self.Advance();
+    let following: int32 = self.Peek();
+    if (following >= 48) && (following <= 57) {
+      self.FailAt(start_line, start_col, "leading zero in number");
+      return false;
+    }
   } else {
     while true {
       let d: int32 = self.Peek();
-      if (d < 48) || (d > 57) {
-        break;
-      }
+      if (d < 48) || (d > 57) { break; }
       self.Advance();
     }
   }
-  let after: int32 = self.Peek();
-  if (after == 46) || (after == 101) || (after == 69) {
-    self.FailAt(start_line, start_col, "floating-point numbers are not supported");
-    return false;
+  var is_decimal: bool = false;
+  if self.Peek() == 46 {
+    is_decimal = true;
+    self.Advance();
+    let fraction_start: int32 = self.pos;
+    while true {
+      let d: int32 = self.Peek();
+      if (d < 48) || (d > 57) { break; }
+      self.Advance();
+    }
+    if self.pos == fraction_start {
+      self.FailAt(start_line, start_col, "fraction requires a digit");
+      return false;
+    }
   }
-  if after == 43 {
-    self.FailAt(start_line, start_col, "invalid number");
-    return false;
+  let exponent: int32 = self.Peek();
+  if (exponent == 101) || (exponent == 69) {
+    is_decimal = true;
+    self.Advance();
+    if (self.Peek() == 43) || (self.Peek() == 45) { self.Advance(); }
+    let exponent_start: int32 = self.pos;
+    while true {
+      let d: int32 = self.Peek();
+      if (d < 48) || (d > 57) { break; }
+      self.Advance();
+    }
+    if self.pos == exponent_start {
+      self.FailAt(start_line, start_col, "exponent requires a digit");
+      return false;
+    }
   }
   let lex: string = self.Src().Slice(start, self.pos);
+  if is_decimal {
+    let raw: string = json_scratch_copy(self.scratch, lex);
+    if raw.length != lex.length {
+      self.FailAt(start_line, start_col, "scratch allocator exhausted");
+      return false;
+    }
+    if !self.handler.Number(raw) {
+      self.aborted = true;
+      self.FailAt(start_line, start_col, "handler aborted");
+      return false;
+    }
+    return true;
+  }
   let parsed: JsonI64Parse = json_parse_i64(lex);
   if parsed.ok {
     if !self.handler.Int64(parsed.value) {
@@ -534,8 +617,17 @@ method(JsonParseCtx) ParseNumber() -> bool {
   }
   let unsigned: JsonU64Parse = json_parse_u64(lex);
   if !unsigned.ok {
-    self.FailAt(start_line, start_col, "integer overflow");
-    return false;
+    let raw: string = json_scratch_copy(self.scratch, lex);
+    if raw.length != lex.length {
+      self.FailAt(start_line, start_col, "scratch allocator exhausted");
+      return false;
+    }
+    if !self.handler.Number(raw) {
+      self.aborted = true;
+      self.FailAt(start_line, start_col, "handler aborted");
+      return false;
+    }
+    return true;
   }
   if !self.handler.UInt64(unsigned.value) {
     self.aborted = true;

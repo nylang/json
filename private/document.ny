@@ -351,6 +351,21 @@ method(JsonDomBuilder) UInt64(v: uint64) -> bool {
   return json_dom_add_value(self.st, JsonFromUInt64(v));
 }
 
+method(JsonDomBuilder) Number(raw: string) -> bool {
+  unsafe {
+    if !json_number_is_valid(raw) {
+      (*self.st).failed = true;
+      return false;
+    }
+    let heap_raw: string = json_durable_copy((*self.st).durable, raw);
+    if (raw.length > 0) && (heap_raw.length <= 0) {
+      (*self.st).failed = true;
+      return false;
+    }
+    return json_dom_add_value(self.st, Json{ node: JsonNumber{ value: heap_raw } });
+  }
+}
+
 method(JsonDomBuilder) String(s: string) -> bool {
   unsafe {
     let heap_s: string = json_durable_copy((*self.st).durable, s);

@@ -16,6 +16,7 @@ pub static kJsonEvEndObject: int32 = 7;
 pub static kJsonEvStartArray: int32 = 8;
 pub static kJsonEvEndArray: int32 = 9;
 pub static kJsonEvUInt64: int32 = 10;
+pub static kJsonEvNumber: int32 = 11;
 
 /**
  * @brief Mutable event log (pointed at by the Handler shell).
@@ -93,6 +94,12 @@ method(JsonEventRecorder) Int64(v: int64) -> bool {
 method(JsonEventRecorder) UInt64(v: uint64) -> bool {
   if !json_ev_push_kind(self.st, kJsonEvUInt64) { return false; }
   unsafe { (*self.st).uints.Push(v); }
+  return true;
+}
+
+method(JsonEventRecorder) Number(raw: string) -> bool {
+  if !json_ev_push_kind(self.st, kJsonEvNumber) { return false; }
+  unsafe { (*self.st).strings.Push(copy(raw)); }
   return true;
 }
 
@@ -305,14 +312,17 @@ func test_json_reader_escapes_and_unicode() {
 }
 
 @test
-func test_json_reader_reject_float_duplicate_trailing() {
+func test_json_reader_preserves_float_duplicate_trailing() {
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var reader: JsonReader = JsonReader.New();
 
   var s1: JsonEvState = json_ev_state_new();
   var r1: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut s1) };
-  let e1: Result<Unit, JsonError> = reader.Parse("1.0", r1, scratch);
-  AssertTrue(e1.IsErr());
+  let e1: Result<Unit, JsonError> = reader.Parse("1.0e+2", r1, scratch);
+  AssertTrue(e1.IsOk());
+  AssertEqI32(s1.kinds.Len(), 1);
+  AssertEqI32(s1.kinds.Get(0), kJsonEvNumber);
+  AssertEqString(s1.strings.Get(0), "1.0e+2");
 
   var s2: JsonEvState = json_ev_state_new();
   var r2: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut s2) };
