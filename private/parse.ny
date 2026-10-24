@@ -88,55 +88,9 @@ func json_hex_digit(b: int32) -> int32 {
  * @brief Encode Unicode scalar `cp` as UTF-8 (BMP + astral up to U+10FFFF).
  */
 func json_utf8_cp(cp: int32) -> string {
-  if cp < 0 {
-    return json_empty_str();
-  }
-  if cp < 128 {
-    var out: string = string.Alloc(1);
-    var b0: uint8 = cp as uint8;
-    memcpy((out.data as *mut uint8), (&b0) as *const uint8, 1 as uintptr);
-    return out;
-  }
-  if cp <= 2047 {
-    var out: string = string.Alloc(2);
-    var b0: uint8 = (192 + (cp / 64)) as uint8;
-    var b1: uint8 = (128 + (cp - (cp / 64) * 64)) as uint8;
-    memcpy((out.data as *mut uint8), (&b0) as *const uint8, 1 as uintptr);
-    let p1: *mut uint8 = (((out.data as *mut int8) as intptr) + (1 as intptr)) as *mut uint8;
-    memcpy(p1, (&b1) as *const uint8, 1 as uintptr);
-    return out;
-  }
-  if cp <= 65535 {
-    var out: string = string.Alloc(3);
-    var b0: uint8 = (224 + (cp / 4096)) as uint8;
-    let r1: int32 = cp - (cp / 4096) * 4096;
-    var b1: uint8 = (128 + (r1 / 64)) as uint8;
-    var b2: uint8 = (128 + (r1 - (r1 / 64) * 64)) as uint8;
-    memcpy((out.data as *mut uint8), (&b0) as *const uint8, 1 as uintptr);
-    let p1: *mut uint8 = (((out.data as *mut int8) as intptr) + (1 as intptr)) as *mut uint8;
-    memcpy(p1, (&b1) as *const uint8, 1 as uintptr);
-    let p2: *mut uint8 = (((out.data as *mut int8) as intptr) + (2 as intptr)) as *mut uint8;
-    memcpy(p2, (&b2) as *const uint8, 1 as uintptr);
-    return out;
-  }
-  if cp <= 1114111 {
-    var out: string = string.Alloc(4);
-    var b0: uint8 = (240 + (cp / 262144)) as uint8;
-    let r1: int32 = cp - (cp / 262144) * 262144;
-    var b1: uint8 = (128 + (r1 / 4096)) as uint8;
-    let r2: int32 = r1 - (r1 / 4096) * 4096;
-    var b2: uint8 = (128 + (r2 / 64)) as uint8;
-    var b3: uint8 = (128 + (r2 - (r2 / 64) * 64)) as uint8;
-    memcpy((out.data as *mut uint8), (&b0) as *const uint8, 1 as uintptr);
-    let p1: *mut uint8 = (((out.data as *mut int8) as intptr) + (1 as intptr)) as *mut uint8;
-    memcpy(p1, (&b1) as *const uint8, 1 as uintptr);
-    let p2: *mut uint8 = (((out.data as *mut int8) as intptr) + (2 as intptr)) as *mut uint8;
-    memcpy(p2, (&b2) as *const uint8, 1 as uintptr);
-    let p3: *mut uint8 = (((out.data as *mut int8) as intptr) + (3 as intptr)) as *mut uint8;
-    memcpy(p3, (&b3) as *const uint8, 1 as uintptr);
-    return out;
-  }
-  return json_empty_str();
+  let encoded: string? = Text.EncodeUtf8(cp);
+  if encoded == nil { return json_empty_str(); }
+  return encoded as string;
 }
 
 func json_parse_i64(s: string) -> JsonI64Parse {
@@ -524,10 +478,13 @@ method(JsonParseCtx) ParseStringRaw() -> string {
       return json_empty_str();
     }
     let s: string = self.Src();
-    var nch: int32 = s.Utf8LenAt(self.pos);
-    if nch < 1 {
-      nch = 1;
+    let decoded: UtfDecodeResult = Text.DecodeUtf8(s, self.pos);
+    if !decoded.valid {
+      buf.Destroy();
+      self.FailHere("invalid UTF-8 in JSON string");
+      return json_empty_str();
     }
+    let nch: int32 = decoded.byte_len;
     buf.Append(s.View(self.pos, nch));
     var k: int32 = 0;
     while k < nch {

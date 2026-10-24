@@ -82,10 +82,14 @@ func json_emit_quote(s: string) -> string {
       i = i + 1;
       continue;
     }
-    var nch: int32 = s.Utf8LenAt(i);
-    if nch < 1 {
-      nch = 1;
+    let decoded: UtfDecodeResult = Text.DecodeUtf8(s, i);
+    if !decoded.valid {
+      let replacement: string? = Text.EncodeUtf8(65533);
+      buf.Append(replacement as string);
+      i = i + 1;
+      continue;
     }
+    let nch: int32 = decoded.byte_len;
     buf.Append(s.View(i, nch));
     i = i + nch;
   }
