@@ -6,5 +6,7 @@ at `60764df138198262c3a3c51875c789a685e369f1` before the independent-package mig
 
 The source manifest currently targets a NyraLang workspace checkout at
 `third_party/json`, with SDK source dependencies under `../../source/`.
-This is a local development arrangement until public repository and dependency
-locations are assigned. Package versions are preserved during extraction.
+The public repository is <https://github.com/nylang/json>. The relative dependency
+paths remain a workspace development arrangement; publishing the repository
+does not enable automatic remote dependency resolution. Package versions are
+preserved during extraction.
