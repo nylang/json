@@ -313,13 +313,13 @@ func test_json_document_parsefile_sample() {
   var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.ParseFile(
-    json_resolve_testdata("tests/support/json/doc_sample.json"),
+    json_resolve_testdata("tests/data/doc_sample.json"),
     durable,
     scratch
   );
   if !r.IsOk() {
     let r2: Result<JsonDocument, JsonError> = JsonDocument.ParseFile(
-      json_resolve_testdata("tests/support/json/doc_sample.json"),
+      json_resolve_testdata("tests/data/doc_sample.json"),
       durable,
       scratch
     );

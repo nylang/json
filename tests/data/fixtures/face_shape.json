@@ -1,0 +1,18 @@
+{
+  "schema": 2,
+  "moduleId": "named_optional_lib",
+  "names": {
+    "Scale": {
+      "name": "Scale",
+      "kind": "func",
+      "pub": true,
+      "ret": "int32",
+      "params": ["int32", "int32", "int32"],
+      "paramInfos": [
+        {"name": "n", "typ": "int32"},
+        {"name": "factor", "typ": "int32", "namedBag": true, "defaultKind": "int", "defaultVal": "2"},
+        {"name": "bonus", "typ": "int32", "namedBag": true, "defaultKind": "int", "defaultVal": "0"}
+      ]
+    }
+  }
+}

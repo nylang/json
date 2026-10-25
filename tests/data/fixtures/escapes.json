@@ -1,0 +1,10 @@
+{
+  "quote": "a\"b",
+  "slash": "a\\b",
+  "nl": "line1\nline2",
+  "tab": "a\tb",
+  "cr": "a\rb",
+  "mix": "x\"y\\z\n",
+  "empty": "",
+  "unicode": "café"
+}

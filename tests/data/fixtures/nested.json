@@ -1,0 +1,14 @@
+{
+  "name": "json",
+  "version": 1,
+  "items": [
+    {"id": 1, "ok": true},
+    {"id": 2, "ok": false, "tags": ["a", "b"]}
+  ],
+  "meta": {
+    "nested": {
+      "depth": 3,
+      "empty": {}
+    }
+  }
+}

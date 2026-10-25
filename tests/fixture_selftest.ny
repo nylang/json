@@ -11,7 +11,7 @@ func json_path_exists(path: string) -> bool {
 }
 
 func json_resolve_testdata(rel: string) -> string {
-  // Test inputs live under repository tests/, independent of the package cwd.
+  // Resolve package-owned fixtures from either the package or workspace cwd.
   var prefix: string = "";
   var depth: int32 = 0;
   while depth < 8 {
@@ -19,6 +19,8 @@ func json_resolve_testdata(rel: string) -> string {
     if json_path_exists(candidate) {
       return candidate;
     }
+    let workspace: string = prefix.Concat("third_party/json/").Concat(rel);
+    if json_path_exists(workspace) { return workspace; }
     prefix = "../".Concat(prefix);
     depth = depth + 1;
   }
@@ -67,23 +69,23 @@ func json_assert_fixture_round_trip(rel: string) {
 
 @test
 func test_json_fixture_scalars() {
-  json_assert_fixture_round_trip("tests/support/json/fixtures/scalars.json");
+  json_assert_fixture_round_trip("tests/data/fixtures/scalars.json");
 }
 
 @test
 func test_json_fixture_nested() {
-  json_assert_fixture_round_trip("tests/support/json/fixtures/nested.json");
+  json_assert_fixture_round_trip("tests/data/fixtures/nested.json");
 }
 
 @test
 func test_json_fixture_escapes() {
-  json_assert_fixture_round_trip("tests/support/json/fixtures/escapes.json");
+  json_assert_fixture_round_trip("tests/data/fixtures/escapes.json");
 }
 
 @test
 func test_json_fixture_face_shape() {
-  json_assert_fixture_round_trip("tests/support/json/fixtures/face_shape.json");
-  let path: string = json_resolve_testdata("tests/support/json/fixtures/face_shape.json");
+  json_assert_fixture_round_trip("tests/data/fixtures/face_shape.json");
+  let path: string = json_resolve_testdata("tests/data/fixtures/face_shape.json");
   AssertTrue(path.length > 0);
   var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
@@ -110,6 +112,6 @@ func test_json_fixture_face_shape() {
 
 @test
 func test_json_fixture_empty_collections() {
-  json_assert_fixture_round_trip("tests/support/json/fixtures/empty_object.json");
-  json_assert_fixture_round_trip("tests/support/json/fixtures/empty_array.json");
+  json_assert_fixture_round_trip("tests/data/fixtures/empty_object.json");
+  json_assert_fixture_round_trip("tests/data/fixtures/empty_array.json");
 }
