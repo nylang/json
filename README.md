@@ -6,18 +6,43 @@ Version: **0.19.0**. Repository: <https://github.com/nylang/json>.
 
 ## Development setup
 
-This source release uses the NyraLang workspace layout: check out this package
-at `third_party/json`, alongside `source/stdlib` and `source/ntest` in the
-workspace. The relative dependency paths in `package.yaml` target that layout.
-A standalone clone does not include these dependencies or a compiler.
-
-Nyra SDK 1.0.0 also includes JSON 0.19.0 for SDK consumers. This repository
-publishes the package source and tests under MIT; it does not contain the
-Nyra compiler implementation.
+A standalone checkout uses the installed SDK's implicit stdlib and ntest
+packages; it does not require the NyraLang private source layout. JSON is an
+independent source package, not a bundled runtime package in SDK 1.0.1 or later.
+The original v0.19.0 tag retains its historical manifest; use the current main
+commit for the portable manifest and lock the resulting Git revision.
 
 See [MIGRATION.md](MIGRATION.md) for source history and the current workspace
 layout. Run the package suite from NyraLang with
 `python3 nyra.py test --package json`. Test data is owned by this repository.
+
+## Portable Git dependency
+
+Source imports use the installed SDK's implicit runtime packages (SDK 1.0.2 or
+later); package manifests contain no paths into the private compiler checkout.
+For automatic Git preparation use native `nyra` 1.0.3 or later. That manager's
+public SDK publication is separate from this package; SDK 1.0.2 does not ship it.
+With SDK 1.0.2, a manual clone and explicit local consumer path remain usable.
+
+Add this dependency to your application's `package.yaml`:
+
+```yaml
+dependencies:
+  json:
+    git: https://github.com/nylang/json.git
+    rev: main
+```
+
+Then run `nyra lock ./app` and commit `nyra.lock`; use
+`nyra fetch ./app --frozen` to prepare the pinned graph again. `main` above is
+an initial selector; the lock fixes the exact commit/content. Normal compiler
+and analyzer operations do not fetch dependencies. Historical tags are immutable
+and may retain older workspace-specific manifests.
+
+For local multi-package development, list package-file pointers in a common
+`workspace.yaml`. Workspace replacements keep Git declarations shareable;
+origin lock updates deliberately disable replacements. A package entry and its
+SDK can move without rewriting publisher paths.
 
 ## License
 
