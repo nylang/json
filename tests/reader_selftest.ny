@@ -1,21 +1,35 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
+part of JsonTests;
+
 /**
  * @brief JsonReader / JsonHandler event unit tests (m_v0.19_p1).
- * @note Recorder state lives behind a pointer so by-value iface upcast (stack temp)
- *       still mutates the same arrays. SoT `ref mut JsonHandler` awaits codegen Load.
+ * @note Recorder state lives behind a pointer so by-value iface upcast (stack temp) still
+ *   mutates the same arrays. SoT `ref mut JsonHandler` awaits codegen Load.
  * @note MemStack/MemArena must be Init'd in-place (ctx points at self).
  */
-part of JsonTypes;
 
 pub static kJsonEvNull: int32 = 1;
+
 pub static kJsonEvBool: int32 = 2;
+
 pub static kJsonEvInt64: int32 = 3;
+
 pub static kJsonEvString: int32 = 4;
+
 pub static kJsonEvStartObject: int32 = 5;
+
 pub static kJsonEvKey: int32 = 6;
+
 pub static kJsonEvEndObject: int32 = 7;
+
 pub static kJsonEvStartArray: int32 = 8;
+
 pub static kJsonEvEndArray: int32 = 9;
+
 pub static kJsonEvUInt64: int32 = 10;
+
 pub static kJsonEvNumber: int32 = 11;
 
 /**
@@ -55,10 +69,12 @@ func json_ev_state_new() -> JsonEvState {
 func json_ev_push_kind(st: *mut JsonEvState, k: int32) -> bool {
   unsafe {
     (*st).seen = (*st).seen + 1;
-    if ((*st).abort_at >= 0) && ((*st).seen > (*st).abort_at) {
+    if ((*st).abort_at >= 0) && ((*st).seen >(*st).abort_at) {
       return false;
     }
+
     (*st).kinds.Push(k);
+
     return true;
   }
 }
@@ -71,6 +87,7 @@ method(JsonEventRecorder) Bool(b: bool) -> bool {
   if !json_ev_push_kind(self.st, kJsonEvBool) {
     return false;
   }
+
   unsafe {
     if b {
       (*self.st).bools.Push(1);
@@ -78,6 +95,7 @@ method(JsonEventRecorder) Bool(b: bool) -> bool {
       (*self.st).bools.Push(0);
     }
   }
+
   return true;
 }
 
@@ -85,21 +103,35 @@ method(JsonEventRecorder) Int64(v: int64) -> bool {
   if !json_ev_push_kind(self.st, kJsonEvInt64) {
     return false;
   }
+
   unsafe {
     (*self.st).ints.Push(v);
   }
+
   return true;
 }
 
 method(JsonEventRecorder) UInt64(v: uint64) -> bool {
-  if !json_ev_push_kind(self.st, kJsonEvUInt64) { return false; }
-  unsafe { (*self.st).uints.Push(v); }
+  if !json_ev_push_kind(self.st, kJsonEvUInt64) {
+    return false;
+  }
+
+  unsafe {
+    (*self.st).uints.Push(v);
+  }
+
   return true;
 }
 
 method(JsonEventRecorder) Number(raw: string) -> bool {
-  if !json_ev_push_kind(self.st, kJsonEvNumber) { return false; }
-  unsafe { (*self.st).strings.Push(copy(raw)); }
+  if !json_ev_push_kind(self.st, kJsonEvNumber) {
+    return false;
+  }
+
+  unsafe {
+    (*self.st).strings.Push(copy(raw));
+  }
+
   return true;
 }
 
@@ -107,9 +139,11 @@ method(JsonEventRecorder) String(s: string) -> bool {
   if !json_ev_push_kind(self.st, kJsonEvString) {
     return false;
   }
+
   unsafe {
     (*self.st).strings.Push(copy(s));
   }
+
   return true;
 }
 
@@ -121,9 +155,11 @@ method(JsonEventRecorder) Key(k: string) -> bool {
   if !json_ev_push_kind(self.st, kJsonEvKey) {
     return false;
   }
+
   unsafe {
     (*self.st).strings.Push(copy(k));
   }
+
   return true;
 }
 
@@ -131,9 +167,11 @@ method(JsonEventRecorder) EndObject(member_count: int32) -> bool {
   if !json_ev_push_kind(self.st, kJsonEvEndObject) {
     return false;
   }
+
   unsafe {
     (*self.st).counts.Push(member_count);
   }
+
   return true;
 }
 
@@ -145,9 +183,11 @@ method(JsonEventRecorder) EndArray(element_count: int32) -> bool {
   if !json_ev_push_kind(self.st, kJsonEvEndArray) {
     return false;
   }
+
   unsafe {
     (*self.st).counts.Push(element_count);
   }
+
   return true;
 }
 
@@ -158,6 +198,7 @@ func json_scratch_from_stack(stack: ref mut MemStack) -> Allocator {
   unsafe {
     let sp: *mut MemStack = cast<MemStack>.pointer(stack);
     let ap: *mut Allocator = cast<Allocator>.pointer(sp);
+
     return *ap;
   }
 }
@@ -169,6 +210,7 @@ func json_scratch_from_arena(arena: ref mut MemArena) -> Allocator {
   unsafe {
     let ap: *mut MemArena = cast<MemArena>.pointer(arena);
     let bp: *mut Allocator = cast<Allocator>.pointer(ap);
+
     return *bp;
   }
 }
@@ -176,7 +218,7 @@ func json_scratch_from_arena(arena: ref mut MemArena) -> Allocator {
 @test
 func test_json_reader_empty_is_error() {
   var state: JsonEvState = json_ev_state_new();
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse("", rec, scratch);
@@ -191,7 +233,7 @@ func test_json_reader_empty_is_error() {
 @test
 func test_json_reader_object_name_string() {
   var state: JsonEvState = json_ev_state_new();
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse("{\"name\":\"x\"}", rec, scratch);
@@ -211,7 +253,7 @@ func test_json_reader_object_name_string() {
 @test
 func test_json_reader_array_scalars() {
   var state: JsonEvState = json_ev_state_new();
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse("[true, false, null, 42, \"hi\"]", rec, scratch);
@@ -237,7 +279,7 @@ func test_json_reader_array_scalars() {
 @test
 func test_json_reader_nested_object() {
   var state: JsonEvState = json_ev_state_new();
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse(
@@ -267,7 +309,7 @@ func test_json_reader_nested_object() {
 func test_json_reader_handler_abort() {
   var state: JsonEvState = json_ev_state_new();
   state.abort_at = 1;
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse("{\"name\":\"x\"}", rec, scratch);
@@ -284,14 +326,14 @@ func test_json_reader_int_and_bool_root() {
   var reader: JsonReader = JsonReader.New();
 
   var state_i: JsonEvState = json_ev_state_new();
-  var rec_i: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state_i) };
+  var rec_i: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state_i)};
   let ri: Result<Unit, JsonError> = reader.Parse("7", rec_i, scratch);
   AssertTrue(ri.IsOk());
   AssertEqI32(state_i.kinds.Get(0), kJsonEvInt64);
   AssertEqI64(state_i.ints.Get(0), 7 as int64);
 
   var state_b: JsonEvState = json_ev_state_new();
-  var rec_b: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state_b) };
+  var rec_b: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state_b)};
   let rb: Result<Unit, JsonError> = reader.Parse("true", rec_b, scratch);
   AssertTrue(rb.IsOk());
   AssertEqI32(state_b.kinds.Get(0), kJsonEvBool);
@@ -301,7 +343,7 @@ func test_json_reader_int_and_bool_root() {
 @test
 func test_json_reader_escapes_and_unicode() {
   var state: JsonEvState = json_ev_state_new();
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse("\"a\\\"b\\n\\u0041\"", rec, scratch);
@@ -317,7 +359,7 @@ func test_json_reader_preserves_float_duplicate_trailing() {
   var reader: JsonReader = JsonReader.New();
 
   var s1: JsonEvState = json_ev_state_new();
-  var r1: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut s1) };
+  var r1: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut s1)};
   let e1: Result<Unit, JsonError> = reader.Parse("1.0e+2", r1, scratch);
   AssertTrue(e1.IsOk());
   AssertEqI32(s1.kinds.Len(), 1);
@@ -325,7 +367,7 @@ func test_json_reader_preserves_float_duplicate_trailing() {
   AssertEqString(s1.strings.Get(0), "1.0e+2");
 
   var s2: JsonEvState = json_ev_state_new();
-  var r2: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut s2) };
+  var r2: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut s2)};
   let e2: Result<Unit, JsonError> = reader.Parse("{\"a\":1,\"a\":2}", r2, scratch);
   AssertTrue(e2.IsErr());
   let eo2: JsonError? = e2.get_if<JsonError>();
@@ -333,7 +375,7 @@ func test_json_reader_preserves_float_duplicate_trailing() {
   AssertEqString((eo2 as JsonError).Message(), "duplicate object key");
 
   var s3: JsonEvState = json_ev_state_new();
-  var r3: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut s3) };
+  var r3: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut s3)};
   let e3: Result<Unit, JsonError> = reader.Parse("true false", r3, scratch);
   AssertTrue(e3.IsErr());
   let eo3: JsonError? = e3.get_if<JsonError>();
@@ -350,7 +392,7 @@ func test_json_reader_memstack_scratch() {
   let scratch: Allocator = json_scratch_from_stack(stack);
   let mark: uintptr = stack.Mark();
   var state: JsonEvState = json_ev_state_new();
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse("{\"a\":1,\"b\":\"two\"}", rec, scratch);
   AssertTrue(r.IsOk());
@@ -360,7 +402,7 @@ func test_json_reader_memstack_scratch() {
   AssertEqString(state.strings.Get(1), "b");
   AssertEqString(state.strings.Get(2), "two");
   var state2: JsonEvState = json_ev_state_new();
-  var rec2: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state2) };
+  var rec2: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state2)};
   let r2: Result<Unit, JsonError> = reader.Parse("{\"x\":\"y\"}", rec2, scratch);
   AssertTrue(r2.IsOk());
   AssertEqString(state2.strings.Get(0), "x");
@@ -376,7 +418,7 @@ func test_json_reader_memarena_scratch() {
   arena.Init(chunk as *mut uint8, 8192 as uintptr);
   let scratch: Allocator = json_scratch_from_arena(arena);
   var state: JsonEvState = json_ev_state_new();
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: cast<JsonEvState>.pointer(&mut state) };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: cast<JsonEvState>.pointer(&mut state)};
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse("{\"name\":\"x\"}", rec, scratch);
   AssertTrue(r.IsOk());

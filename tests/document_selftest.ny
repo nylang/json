@@ -1,10 +1,14 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
+part of JsonTests;
+
 /**
  * @brief JsonDocument build / query / durable-vs-scratch ownership tests (m_v0.19_p2).
  * @note MemStack/MemArena scratch helpers: `json_scratch_from_stack` / `json_scratch_from_arena`
- *       (defined in `reader_selftest.ny`, same JsonTypes module).
+ *   (defined in `reader_selftest.ny`, same JsonTypes module).
  * @see docs/design/stdlib/json.md §0.5–0.6
  */
-part of JsonTypes;
 
 @test
 func test_json_document_empty_is_error() {
@@ -193,6 +197,7 @@ func test_json_document_parse_error() {
 }
 
 @test
+// Resetting parse scratch must not invalidate strings copied into the document allocator.
 func test_json_document_memstack_scratch_reset_durable() {
   let chunk: *mut int8 = _nyra_malloc(8192 as int64, 8 as int64);
   AssertTrue(chunk != (ptr<int8>.null()));
@@ -211,7 +216,6 @@ func test_json_document_memstack_scratch_reset_durable() {
   let doc_opt: JsonDocument? = r.get_if<JsonDocument>();
   AssertTrue(doc_opt != nil);
   var doc: JsonDocument = doc_opt as JsonDocument;
-
   // Scratch Reset must not invalidate durable Document strings / query results.
   stack.Reset(mark);
 
@@ -237,7 +241,6 @@ func test_json_document_memstack_scratch_reset_durable() {
   let ia: int64? = JsonAsInt(va as Json);
   AssertTrue(ia != nil);
   AssertEqI64(ia as int64, 1 as int64);
-
   // Scratch reusable after Reset; Document still valid.
   let r2: Result<JsonDocument, JsonError> = JsonDocument.Parse("{\"x\":\"y\"}", durable, scratch);
   AssertTrue(r2.IsOk());
@@ -254,7 +257,6 @@ func test_json_document_memstack_scratch_reset_durable() {
   let xs: JsonStr? = xv_n.node.get_if<JsonStr>();
   AssertTrue(xs != nil);
   AssertEqString((xs as JsonStr).Text(), "y");
-
   // Original document still queryable after second Parse reused scratch.
   let root_again: Json = doc.Root();
   let obj_again_opt: JsonObject? = JsonAsObject(root_again);
@@ -268,6 +270,7 @@ func test_json_document_memstack_scratch_reset_durable() {
 }
 
 @test
+// The durable document must outlive reuse of the temporary parsing arena.
 func test_json_document_memarena_scratch_reset_durable() {
   let chunk: *mut int8 = _nyra_malloc(8192 as int64, 8 as int64);
   AssertTrue(chunk != (ptr<int8>.null()));
@@ -339,6 +342,7 @@ func test_json_document_parsefile_sample() {
     AssertEqString((name_s as JsonStr).Text(), "json");
     return;
   }
+
   let doc_opt: JsonDocument? = r.get_if<JsonDocument>();
   AssertTrue(doc_opt != nil);
   var doc: JsonDocument = doc_opt as JsonDocument;

@@ -1,10 +1,12 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
 /**
  * @brief Product face for package `json` — Handler/Reader/Document/Writer.
- * @note Layouts and accessors live in `public/`; Reader/Document/Writer in `private/`.
+ * @note Value layouts live on this face; accessors, Reader, Document and Writer have separate implementation modules.
  * @note Hard cut: no free `Parse`/`ParseFile`/`Emit` (json.md §0.2).
  * @see docs/design/stdlib/json.md §0
  */
-
 import "stdlib:stdlib.ny";
 
 /**
@@ -30,10 +32,14 @@ pub interface JsonHandler {
  * @brief UTF-8 bytes → Handler events; parse temps on caller `scratch` Allocator.
  * @see docs/design/stdlib/json.md §0.4
  */
-pub struct JsonReader { _pad: int8; }
+pub struct JsonReader {
+  _pad: int8;
+}
 
 /**
  * @brief Construct a Reader (stateless; scratch is per-Parse).
+ * @returns The JsonReader value described above, retaining the documented ownership and
+ *   default-state semantics.
  */
 pub static method(JsonReader) New() -> JsonReader;
 
@@ -41,9 +47,11 @@ pub static method(JsonReader) New() -> JsonReader;
  * @brief Parse `text` and publish Handler events in document order.
  * @param text UTF-8 source; empty / whitespace-only input is a Parse error (JSON grammar).
  * @param handler SAX receiver (iface by value — Drawable peer; fat pointer mutates impl state).
- * @param scratch `MemStack` / `MemArena` (as `Allocator`) for Key/String temps; not durable nodes.
+ * @param scratch `MemStack` / `MemArena` (as `Allocator`) for Key/String temps; not durable
+ *   nodes.
  * @returns Ok on full publish; Err on scan/parse failure or handler abort.
- * @note SoT spells `ref mut JsonHandler`; host-nyra iface dispatch requires by-value iface today.
+ * @note SoT spells `ref mut JsonHandler`; host-nyra iface dispatch requires by-value iface
+ *   today.
  */
 pub method(JsonReader) Parse(
   text: string,
@@ -53,6 +61,7 @@ pub method(JsonReader) Parse(
 
 /**
  * @brief Read `path` then `Parse`.
+ * @returns Ok with Unit on success; Err with JsonError on the failure paths described above.
  * @note I/O failures use `line: 0`, `column: 0`; `message` includes `path`.
  */
 pub method(JsonReader) ParseFile(
@@ -66,13 +75,19 @@ pub method(JsonReader) ParseFile(
  * @note Nodes/strings retained on `durable`; parse temps on `scratch` (json.md §0.6).
  * @see docs/design/stdlib/json.md §0.4–0.5
  */
-pub struct JsonDocument { root: Json; }
+pub struct JsonDocument {
+  root: Json;
+}
 
 /**
  * @brief Parse `text` into a durable DOM via Reader → Document Handler adapter.
  * @param text UTF-8 source; empty input is a Parse error (JSON grammar).
- * @param durable Allocator for Key/String (and Document storage); typical hosted: `CreateAllocator`.
- * @param scratch `MemStack` / `MemArena` (as `Allocator`) for Reader temps; Reset after Ok must not pin Document.
+ * @param durable Allocator for Key/String (and Document storage); typical hosted:
+ *   `CreateAllocator`.
+ * @param scratch `MemStack` / `MemArena` (as `Allocator`) for Reader temps; Reset after Ok must
+ *   not pin Document.
+ * @returns Ok with JsonDocument on success; Err with JsonError on the failure paths described
+ *   above.
  */
 pub static method(JsonDocument) Parse(
   text: string,
@@ -82,6 +97,8 @@ pub static method(JsonDocument) Parse(
 
 /**
  * @brief Read `path` then `JsonDocument.Parse`.
+ * @returns Ok with JsonDocument on success; Err with JsonError on the failure paths described
+ *   above.
  * @note I/O failures use `line: 0`, `column: 0`; `message` includes `path`.
  */
 pub static method(JsonDocument) ParseFile(
@@ -92,44 +109,116 @@ pub static method(JsonDocument) ParseFile(
 
 /**
  * @brief Document root node (retain-copy of the durable tree root).
+ * @returns The Json value described above, retaining the documented ownership and default-state
+ *   semantics.
  */
 pub method(JsonDocument) Root() -> Json;
 
 /**
  * @brief SAX/DOM Writer — implements `JsonHandler`; events or `Accept` → toolchain JSON text.
  * @see docs/design/stdlib/json.md §0.4 · §1.5
+ *
+ * @note Handler methods are on the product face; private shell rebuilds via DomBuilder for
+ *   `Accept` (host-nyra pub-struct `implements` itable edge — DomBuilder peer).
  */
-/**
- * @note Handler methods are on the product face; private shell rebuilds via DomBuilder
- *       for `Accept` (host-nyra pub-struct `implements` itable edge — DomBuilder peer).
- */
-pub struct JsonWriter { st: *mut int8; }
+pub struct JsonWriter {
+  st: *mut int8;
+}
 
 /**
  * @brief Construct an empty Writer (Handler state on the heap).
+ * @returns The JsonWriter value described above, retaining the documented ownership and
+ *   default-state semantics.
  */
 pub static method(JsonWriter) New() -> JsonWriter;
 
 /**
  * @brief UTF-8 JSON text accumulated from Handler events / `Accept`.
+ * @returns UTF-8 JSON text accumulated from Handler events / `Accept`.
  */
 pub method(JsonWriter) GetString() -> string;
 
 /**
  * @brief Serialize `node` via `New` → `node.Accept(writer)` → `GetString`.
+ * @returns Serialize `node` via `New` → `node.Accept(writer)` → `GetString`.
  */
 pub static method(JsonWriter) Emit(node: Json) -> string;
 
+/**
+ * @brief Append a null scalar event.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) Null() -> bool;
+
+/**
+ * @brief Append a boolean scalar event.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) Bool(b: bool) -> bool;
+
+/**
+ * @brief Append a signed integer scalar event.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) Int64(v: int64) -> bool;
+
+/**
+ * @brief Append an unsigned integer scalar event.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) UInt64(v: uint64) -> bool;
+
+/**
+ * @brief Append an exact validated JSON number lexeme.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) Number(raw: string) -> bool;
+
+/**
+ * @brief Append a string scalar event.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) String(s: string) -> bool;
+
+/**
+ * @brief Begin an object/mapping container.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) StartObject() -> bool;
+
+/**
+ * @brief Set the next object/mapping key.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) Key(k: string) -> bool;
+
+/**
+ * @brief Finish the current object/mapping event with its member count.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) EndObject(member_count: int32) -> bool;
+
+/**
+ * @brief Begin an array/sequence container.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) StartArray() -> bool;
+
+/**
+ * @brief Finish the current array/sequence event with its element count.
+ * @returns True when the DOM writer accepts the event; false for unavailable state or an
+ *   event/build failure.
+ */
 pub method(JsonWriter) EndArray(element_count: int32) -> bool;
 
 /**
@@ -141,56 +230,81 @@ pub method(Json) Accept(handler: JsonHandler) -> bool;
 /**
  * @brief JSON `null`. Arm 0 of `Json`.
  */
-pub struct JsonNull { _pad: int8; }
+pub struct JsonNull {
+  _pad: int8;
+}
 
 /**
  * @brief JSON bool (`true` / `false`). Arm 1.
  */
-pub struct JsonBool { value: bool; }
+pub struct JsonBool {
+  value: bool;
+}
 
 /**
  * @brief Decimal signed integer that fits `int64`. Arm 2.
  */
-pub struct JsonInt { value: int64; unsigned_value: uint64; is_unsigned: bool; }
+pub struct JsonInt {
+  value: int64;
+  unsigned_value: uint64;
+  is_unsigned: bool;
+}
 
 /**
  * @brief Exact JSON number lexeme used for fractions, exponents, and integers outside uint64.
  * @note Preserves the original spelling so parse/emit does not lose precision.
  */
-pub struct JsonNumber { value: string; }
+pub struct JsonNumber {
+  value: string;
+}
 
 /**
  * @brief JSON string (UTF-8; escapes decoded). Arm 3.
  */
-pub struct JsonStr { value: string; }
+pub struct JsonStr {
+  value: string;
+}
 
 /**
  * @brief Array node; `items` insertion order. Arm 4.
  */
-pub struct JsonArray { items: Array<Json>; }
+pub struct JsonArray {
+  items: Array<Json>;
+}
 
 /**
  * @brief One object entry; keys are strings only.
  */
-pub struct JsonObjectEntry { key: string; value: Json; }
+pub struct JsonObjectEntry {
+  key: string;
+  value: Json;
+}
 
 /**
  * @brief Object node; `entries` insertion / parse order. Arm 5.
  */
-pub struct JsonObject { entries: Array<JsonObjectEntry>; }
+pub struct JsonObject {
+  entries: Array<JsonObjectEntry>;
+}
 
 /**
  * @brief In-memory JSON value tree.
- * @note json.md §1.3 escape hatch: `struct Json { node: variant<…> }` because recursive
- *       `typedef Json = variant<…>` through `Array<Json>` is rejected. Do not rename to JsonNode.
+ * @note json.md §1.3 escape hatch: `struct Json { node: variant<…> }` because recursive `typedef
+ *   Json = variant<…>` through `Array<Json>` is rejected. Do not rename to JsonNode.
  */
-pub struct Json { node: variant<JsonNull, JsonBool, JsonInt, JsonNumber, JsonStr, JsonArray, JsonObject>; }
+pub struct Json {
+  node: variant<JsonNull, JsonBool, JsonInt, JsonNumber, JsonStr, JsonArray, JsonObject>;
+}
 
 /**
  * @brief Parse or I/O failure from this library (not a compiler `NYxxxx`).
  * @note `line` / `column` are 1-based for scan/parse errors; I/O may use 0.
  */
-pub struct JsonError { line: int32; column: int32; message: string; }
+pub struct JsonError {
+  line: int32;
+  column: int32;
+  message: string;
+}
 
 /**
  * @brief First entry whose key equals `key`, or `nil` if absent.
@@ -207,12 +321,14 @@ pub method(JsonObject) Len() -> int32;
 
 /**
  * @brief Key of the entry at 0-based `index`, or `nil` if out of range.
+ * @returns The matching payload, or nil for the absent/out-of-range case described above.
  * @note Cross-package field access on `JsonObjectEntry` is not available; use this helper.
  */
 pub method(JsonObject) KeyAt(index: int32) -> string?;
 
 /**
  * @brief Value of the entry at 0-based `index`, or `nil` if out of range.
+ * @returns The matching payload, or nil for the absent/out-of-range case described above.
  */
 pub method(JsonObject) ValueAt(index: int32) -> Json?;
 
@@ -231,53 +347,147 @@ pub method(JsonArray) Len() -> int32;
 
 /**
  * @brief UTF-8 payload of a string scalar (cross-package accessor).
+ * @returns UTF-8 payload of a string scalar (cross-package accessor).
  */
 pub method(JsonStr) Text() -> string;
 
 /**
  * @brief Integer scalar payload.
+ * @returns Integer scalar payload.
  */
 pub method(JsonInt) I64() -> int64;
+
+/**
+ * @brief Read the retained exact JSON number spelling.
+ * @returns Original number text, without floating-point conversion.
+ */
 pub method(JsonNumber) Text() -> string;
 
 /**
  * @brief Bool scalar payload.
+ * @returns Bool scalar payload.
  */
 pub method(JsonBool) Value() -> bool;
 
+/**
+ * @brief Read a representable signed integer from the document node.
+ * @returns The matching payload, or nil when the node cannot be represented by that accessor.
+ */
 pub func JsonAsInt(doc: Json) -> int64?;
+
+/**
+ * @brief Read a representable unsigned integer from the document node.
+ * @returns The matching payload, or nil when the node cannot be represented by that accessor.
+ */
 pub func JsonAsUInt64(doc: Json) -> uint64?;
+
+/**
+ * @brief Read an exact numeric lexeme from the document node.
+ * @returns The matching payload, or nil when the node cannot be represented by that accessor.
+ */
 pub func JsonAsNumber(doc: Json) -> string?;
+
+/**
+ * @brief Read a boolean from the document node.
+ * @returns The matching payload, or nil when the node cannot be represented by that accessor.
+ */
 pub func JsonAsBool(doc: Json) -> bool?;
+
+/**
+ * @brief Read a string from the document node.
+ * @returns The matching payload, or nil when the node cannot be represented by that accessor.
+ */
 pub func JsonAsStr(doc: Json) -> string?;
+
+/**
+ * @brief Read an object from the document node.
+ * @returns The matching payload, or nil when the node cannot be represented by that accessor.
+ */
 pub func JsonAsObject(doc: Json) -> JsonObject?;
+
+/**
+ * @brief Read an array from the document node.
+ * @returns The matching payload, or nil when the node cannot be represented by that accessor.
+ */
 pub func JsonAsArray(doc: Json) -> JsonArray?;
+
+/**
+ * @brief Test whether a document node holds the null variant.
+ * @returns True only for JsonNull; false for every other variant.
+ */
 pub func JsonIsNull(doc: Json) -> bool;
 
 /**
  * @brief Construct scalar / collection nodes without cross-package `.node` field access.
- * @note Callers outside package `json` should use these (or `JsonWriter`) rather than
- *       `Json{ node: … }` literals — host codegen NY6002 on `.node` in large importers.
+ * @returns The Json value described above, retaining the documented ownership and default-state
+ *   semantics.
+ * @note Callers outside package `json` should use these (or `JsonWriter`) rather than `Json{
+ *   node: … }` literals — host codegen NY6002 on `.node` in large importers.
  */
 pub func JsonFromBool(v: bool) -> Json;
+
+/**
+ * @brief Construct a signed integer document node.
+ * @returns A document value retaining its scalar or collection payload through normal language
+ *   ownership.
+ */
 pub func JsonFromInt(v: int64) -> Json;
+
+/**
+ * @brief Construct a unsigned integer document node.
+ * @returns A document value retaining its scalar or collection payload through normal language
+ *   ownership.
+ */
 pub func JsonFromUInt64(v: uint64) -> Json;
+
+/**
+ * @brief Construct an exact number node without rounding the original spelling.
+ * @returns A retained numeric lexeme, or nil when raw is not valid JSON number syntax.
+ */
 pub func JsonFromNumber(raw: string) -> Json?;
+
+/**
+ * @brief Construct a string document node.
+ * @returns A document value retaining its scalar or collection payload through normal language
+ *   ownership.
+ */
 pub func JsonFromStr(s: string) -> Json;
+
+/**
+ * @brief Construct a array document node.
+ * @returns A document value retaining its scalar or collection payload through normal language
+ *   ownership.
+ */
 pub func JsonFromArray(items: Array<Json>) -> Json;
+
+/**
+ * @brief Construct a object document node.
+ * @returns A document value retaining its scalar or collection payload through normal language
+ *   ownership.
+ */
 pub func JsonFromObject(entries: Array<JsonObjectEntry>) -> Json;
 
 /**
  * @brief 1-based line (0 for I/O errors).
+ * @returns 1-based line (0 for I/O errors).
  */
 pub method(JsonError) Line() -> int32;
 
 /**
  * @brief 1-based column (0 for I/O errors).
+ * @returns 1-based column (0 for I/O errors).
  */
 pub method(JsonError) Column() -> int32;
 
 /**
  * @brief English error detail (no `NYxxxx`).
+ * @returns English error detail (no `NYxxxx`).
  */
 pub method(JsonError) Message() -> string;
+
+/**
+ * @brief Compare two JSON trees structurally and by retained scalar values.
+ * @returns True when node kinds and their recursive contents match.
+ * @note Existing comparison entry retained when implementation modules were separated.
+ */
+pub func JsonTreesEqual(a: Json, b: Json) -> bool;

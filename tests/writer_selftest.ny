@@ -1,26 +1,32 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
+part of JsonTests;
+
 /**
  * @brief JsonWriter / Accept / Emit tests (m_v0.19_p3).
  * @see docs/design/stdlib/json.md §0.4 · §1.5
  */
-part of JsonTypes;
 
 func json_parse_tree(text: string) -> Json {
   var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
   var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(text, durable, scratch);
   if !r.IsOk() {
-    return json_null_node();
+    return Json{node: JsonNull{_pad: 0}};
   }
+
   let doc_opt: JsonDocument? = r.get_if<JsonDocument>();
   if doc_opt == nil {
-    return json_null_node();
+    return Json{node: JsonNull{_pad: 0}};
   }
+
   return (doc_opt as JsonDocument).Root();
 }
 
 @test
 func test_json_writer_emit_null() {
-  let n: Json = Json{ node: JsonNull{ _pad: 0 } };
+  let n: Json = Json{node: JsonNull{_pad: 0}};
   let text: string = JsonWriter.Emit(n);
   AssertEqString(text, "null");
 }
@@ -64,7 +70,7 @@ func test_json_writer_new_handler_get_string() {
 func test_json_accept_handler_events() {
   var st: JsonEvState = json_ev_state_new();
   let stp: *mut JsonEvState = cast<JsonEvState>.pointer(& mut st);
-  var rec: JsonEventRecorder = JsonEventRecorder{ st: stp };
+  var rec: JsonEventRecorder = JsonEventRecorder{st: stp};
   let node: Json = json_parse_tree("[true, null]");
   AssertTrue(node.Accept(rec));
   AssertTrue(st.kinds.Len() >= 4);

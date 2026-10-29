@@ -1,8 +1,12 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
+part of JsonTests;
+
 /**
  * @brief JsonWriter.Emit + Document round-trip tests (walk `Json.node` in JsonTypes).
  * @see docs/design/stdlib/json.md §1.5
  */
-part of JsonTypes;
 
 func json_assert_round_trip(node: Json) {
   // Emit takes Json by value (move). Compare two Document parses of the emitted text.
@@ -17,7 +21,7 @@ func json_assert_round_trip(node: Json) {
   AssertTrueMsg(r2.IsOk(), text);
   let doc2_opt: JsonDocument? = r2.get_if<JsonDocument>();
   AssertTrue(doc2_opt != nil);
-  AssertTrue(JsonTreesEqual((doc_opt as JsonDocument).Root(), (doc2_opt as JsonDocument).Root()));
+  AssertTrue(JsonTreesEqual((doc_opt as JsonDocument).Root(),(doc2_opt as JsonDocument).Root()));
 }
 
 func json_assert_round_trip_text(src: string) {
@@ -25,21 +29,22 @@ func json_assert_round_trip_text(src: string) {
 }
 
 func json_emit_quoted(s: string) -> string {
-  let n: Json = Json{ node: JsonStr{ value: copy(s) } };
+  let n: Json = Json{node: JsonStr{value: copy(s)}};
+
   return JsonWriter.Emit(n);
 }
 
 @test
 func test_json_emit_empty_collections_and_null() {
-  let n: Json = Json{ node: JsonNull{ _pad: 0 } };
+  let n: Json = Json{node: JsonNull{_pad: 0}};
   let nt: string = JsonWriter.Emit(n);
   AssertEqString(nt, "null");
   json_assert_round_trip(n);
-  let empty_obj: Json = Json{ node: JsonObject{ entries: Array<JsonObjectEntry>{} } };
+  let empty_obj: Json = Json{node: JsonObject{entries: Array<JsonObjectEntry>{}}};
   let mt: string = JsonWriter.Emit(empty_obj);
   AssertEqString(mt, "{}");
   json_assert_round_trip(empty_obj);
-  let empty_arr: Json = Json{ node: JsonArray{ items: Array<Json>{} } };
+  let empty_arr: Json = Json{node: JsonArray{items: Array<Json>{}}};
   let st: string = JsonWriter.Emit(empty_arr);
   AssertEqString(st, "[]");
   json_assert_round_trip(empty_arr);
@@ -49,14 +54,14 @@ func test_json_emit_empty_collections_and_null() {
 func test_json_emit_quotes_special_chars() {
   let quote: string = json_emit_quoted("a\"b");
   AssertTrue(quote.Contains("\\\""));
-  json_assert_round_trip(Json{ node: JsonStr{ value: copy("a\"b") } });
-  json_assert_round_trip(Json{ node: JsonStr{ value: copy("true") } });
-  json_assert_round_trip(Json{ node: JsonStr{ value: copy("1") } });
-  json_assert_round_trip(Json{ node: JsonStr{ value: copy("") } });
-  json_assert_round_trip(Json{ node: JsonStr{ value: copy("hello world") } });
+  json_assert_round_trip(Json{node: JsonStr{value: copy("a\"b")}});
+  json_assert_round_trip(Json{node: JsonStr{value: copy("true")}});
+  json_assert_round_trip(Json{node: JsonStr{value: copy("1")}});
+  json_assert_round_trip(Json{node: JsonStr{value: copy("")}});
+  json_assert_round_trip(Json{node: JsonStr{value: copy("hello world")}});
   let nl: string = json_emit_quoted("a\nb");
   AssertTrue(nl.Contains("\\n"));
-  json_assert_round_trip(Json{ node: JsonStr{ value: copy("a\nb\tc\\d") } });
+  json_assert_round_trip(Json{node: JsonStr{value: copy("a\nb\tc\\d")}});
 }
 
 @test

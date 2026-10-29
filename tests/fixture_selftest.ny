@@ -1,12 +1,17 @@
+// Copyright (c) 2026 tangxiangjiang
+// SPDX-License-Identifier: MIT
+
+part of JsonTests;
+
 /**
  * @brief Package fixtures: ParseFile → Emit → Parse tree equality (m_v0.19_p3).
  * @note Face-shaped fixture mirrors check_faces_selftest DecodeFaceJSON payload (schema 2).
  * @see docs/design/stdlib/json.md §1.5 · §2
  */
-part of JsonTypes;
 
 func json_path_exists(path: string) -> bool {
   let f: File = File.New(path);
+
   return f.Exists();
 }
 
@@ -19,11 +24,16 @@ func json_resolve_testdata(rel: string) -> string {
     if json_path_exists(candidate) {
       return candidate;
     }
+
     let workspace: string = prefix.Concat("third_party/json/").Concat(rel);
-    if json_path_exists(workspace) { return workspace; }
+    if json_path_exists(workspace) {
+      return workspace;
+    }
+
     prefix = "../".Concat(prefix);
     depth = depth + 1;
   }
+
   return copy("");
 }
 
@@ -36,12 +46,14 @@ func json_assert_fixture_round_trip(rel: string) {
   if !r.IsOk() {
     let eo: JsonError? = r.get_if<JsonError>();
     if eo != nil {
-      AssertTrueMsg(false, (eo as JsonError).Message());
+      AssertTrueMsg(false,(eo as JsonError).Message());
     } else {
       AssertTrueMsg(false, path);
     }
+
     return;
   }
+
   let doc_opt: JsonDocument? = r.get_if<JsonDocument>();
   AssertTrue(doc_opt != nil);
   let text: string = JsonWriter.Emit((doc_opt as JsonDocument).Root());
@@ -49,12 +61,14 @@ func json_assert_fixture_round_trip(rel: string) {
   if !r2.IsOk() {
     let eo2: JsonError? = r2.get_if<JsonError>();
     if eo2 != nil {
-      AssertTrueMsg(false, (eo2 as JsonError).Message().Concat(" | ").Concat(text));
+      AssertTrueMsg(false,(eo2 as JsonError).Message().Concat(" | ").Concat(text));
     } else {
       AssertTrueMsg(false, text);
     }
+
     return;
   }
+
   let doc2_opt: JsonDocument? = r2.get_if<JsonDocument>();
   AssertTrue(doc2_opt != nil);
   let r3: Result<JsonDocument, JsonError> = JsonDocument.ParseFile(path, durable, scratch);
@@ -62,7 +76,7 @@ func json_assert_fixture_round_trip(rel: string) {
   let doc3_opt: JsonDocument? = r3.get_if<JsonDocument>();
   AssertTrue(doc3_opt != nil);
   AssertTrueMsg(
-    JsonTreesEqual((doc2_opt as JsonDocument).Root(), (doc3_opt as JsonDocument).Root()),
+    JsonTreesEqual((doc2_opt as JsonDocument).Root(),(doc3_opt as JsonDocument).Root()),
     text
   );
 }
