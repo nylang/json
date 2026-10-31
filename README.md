@@ -15,8 +15,8 @@ independent source package, not a bundled runtime package in SDK 1.0.1 or later.
 The original v0.19.0 tag retains its historical manifest. Use the immutable
 1.0.5-compatible development revision below; no new package tag is claimed.
 
-See [MIGRATION.md](MIGRATION.md) for source history and the current workspace
-layout. Run the package suite from NyraLang with
+See [MIGRATION.md](MIGRATION.md) for source history and portable dependency
+setup. Run the package suite from NyraLang with
 `python3 nyra.py test --package json`. Test data is owned by this repository.
 
 ## Portable Git dependency
