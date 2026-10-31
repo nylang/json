@@ -13,11 +13,12 @@ import "private/model.ny";
  * @note Product entry is `JsonWriter.Emit`; this is the shared body used by `GetString`.
  */
 
-struct JsonEmitter {
+/** @brief Stateful JSON text encoder; owns output, not DOM mutation or parser state. */
+pub struct JsonEmitter {
   buf: StringBuffer;
 }
 
-func json_hex_char(n: int32) -> string {
+static method(JsonEmitter) HexDigit(n: int32) -> string {
   var d: int32 = n;
   if d < 0 {
     d = 0;
@@ -28,17 +29,17 @@ func json_hex_char(n: int32) -> string {
   }
 
   if d < 10 {
-    return JsonUtf8Cp(48 + d);
+    return string.Utf8Encode(48 + d);
   }
 
-  return JsonUtf8Cp(87 + d);
+  return string.Utf8Encode(87 + d);
 }
 
-func json_u00(b: int32) -> string {
+static method(JsonEmitter) EscapeByte(b: int32) -> string {
   var buf: StringBuffer = StringBuffer.NewWithCapacity(6);
   buf.Append("\\u00");
-  buf.Append(json_hex_char((b / 16) & 15));
-  buf.Append(json_hex_char(b & 15));
+  buf.Append(JsonEmitter.HexDigit((b / 16) & 15));
+  buf.Append(JsonEmitter.HexDigit(b & 15));
 
   return buf.Take();
 }
@@ -47,13 +48,13 @@ func json_u00(b: int32) -> string {
  * @brief Quote `s` as a JSON string (escapes `\\` `\"` + short forms / `\u00XX`).
  * @note Peer of `face_json_quote` / `yaml_emit_quote` escape subset (json.md §1.5).
  */
-func json_emit_quote(s: string) -> string {
+static method(JsonEmitter) Quote(s: string) -> string {
   var buf: StringBuffer = StringBuffer.NewWithCapacity(s.length + 2);
   buf.Append("\"");
   var i: int32 = 0;
   let n: int32 = s.length;
   while i < n {
-    let b: int32 = JsonByteAt(s, i);
+    let b: int32 = s.ByteAt(i);
     if b == 92 {
       buf.Append("\\\\");
       i = i + 1;
@@ -97,7 +98,7 @@ func json_emit_quote(s: string) -> string {
     }
 
     if (b < 32) || (b == 127) {
-      buf.Append(json_u00(b));
+      buf.Append(JsonEmitter.EscapeByte(b));
       i = i + 1;
       continue;
     }
@@ -123,17 +124,19 @@ func json_emit_quote(s: string) -> string {
 // Handle the signed minimum through unsigned magnitude instead of negating it in the signed domain.
 
 // Compare retained DOM structure and scalar payloads to validate semantic round trips rather than output whitespace.
-func json_trees_equal(a: Json, b: Json) -> bool {
-  if a.node.holds<JsonNull>() {
+/** @brief Compare retained JSON tree kinds, scalar values and collection structure.
+ * @returns True for recursively equal values; false for different kinds or contents. */
+pub method(Json) Equals(b: Json) -> bool {
+  if self.node.holds<JsonNull>() {
     return b.node.holds<JsonNull>();
   }
 
-  if a.node.holds<JsonBool>() {
+  if self.node.holds<JsonBool>() {
     if !b.node.holds<JsonBool>() {
       return false;
     }
 
-    let ab: JsonBool? = a.node.get_if<JsonBool>();
+    let ab: JsonBool? = self.node.get_if<JsonBool>();
     let bb: JsonBool? = b.node.get_if<JsonBool>();
     if ab == nil {
       return false;
@@ -149,12 +152,12 @@ func json_trees_equal(a: Json, b: Json) -> bool {
     return abv.value == bbv.value;
   }
 
-  if a.node.holds<JsonInt>() {
+  if self.node.holds<JsonInt>() {
     if !b.node.holds<JsonInt>() {
       return false;
     }
 
-    let ai: JsonInt? = a.node.get_if<JsonInt>();
+    let ai: JsonInt? = self.node.get_if<JsonInt>();
     let bi: JsonInt? = b.node.get_if<JsonInt>();
     if ai == nil {
       return false;
@@ -177,12 +180,12 @@ func json_trees_equal(a: Json, b: Json) -> bool {
     return aiv.value == biv.value;
   }
 
-  if a.node.holds<JsonNumber>() {
+  if self.node.holds<JsonNumber>() {
     if !b.node.holds<JsonNumber>() {
       return false;
     }
 
-    let an: JsonNumber? = a.node.get_if<JsonNumber>();
+    let an: JsonNumber? = self.node.get_if<JsonNumber>();
     let bn: JsonNumber? = b.node.get_if<JsonNumber>();
     if an == nil || bn == nil {
       return false;
@@ -191,12 +194,12 @@ func json_trees_equal(a: Json, b: Json) -> bool {
     return (an as JsonNumber).value == (bn as JsonNumber).value;
   }
 
-  if a.node.holds<JsonStr>() {
+  if self.node.holds<JsonStr>() {
     if !b.node.holds<JsonStr>() {
       return false;
     }
 
-    let asv: JsonStr? = a.node.get_if<JsonStr>();
+    let asv: JsonStr? = self.node.get_if<JsonStr>();
     let bsv: JsonStr? = b.node.get_if<JsonStr>();
     if asv == nil {
       return false;
@@ -212,12 +215,12 @@ func json_trees_equal(a: Json, b: Json) -> bool {
     return (asvv.value == bsvv.value);
   }
 
-  if a.node.holds<JsonArray>() {
+  if self.node.holds<JsonArray>() {
     if !b.node.holds<JsonArray>() {
       return false;
     }
 
-    let aarr: JsonArray? = a.node.get_if<JsonArray>();
+    let aarr: JsonArray? = self.node.get_if<JsonArray>();
     let barr: JsonArray? = b.node.get_if<JsonArray>();
     if aarr == nil {
       return false;
@@ -239,7 +242,7 @@ func json_trees_equal(a: Json, b: Json) -> bool {
       unsafe {
         let pa: *mut Json = &mut sa.items.buf[i];
         let pb: *mut Json = &mut sb.items.buf[i];
-        if !json_trees_equal((*pa),(*pb)) {
+        if !((*pa)).Equals((*pb)) {
           return false;
         }
       }
@@ -250,12 +253,12 @@ func json_trees_equal(a: Json, b: Json) -> bool {
     return true;
   }
 
-  if a.node.holds<JsonObject>() {
+  if self.node.holds<JsonObject>() {
     if !b.node.holds<JsonObject>() {
       return false;
     }
 
-    let am: JsonObject? = a.node.get_if<JsonObject>();
+    let am: JsonObject? = self.node.get_if<JsonObject>();
     let bm: JsonObject? = b.node.get_if<JsonObject>();
     if am == nil {
       return false;
@@ -281,7 +284,7 @@ func json_trees_equal(a: Json, b: Json) -> bool {
           return false;
         }
 
-        if !json_trees_equal((*ea).value,(*eb).value) {
+        if !((*ea).value).Equals((*eb).value) {
           return false;
         }
       }
@@ -326,7 +329,7 @@ method(JsonEmitter) EmitObject(objv: JsonObject) -> void {
 
     unsafe {
       let ep: *mut JsonObjectEntry = &mut objv.entries.buf[i];
-      self.buf.Append(json_emit_quote((*ep).key));
+      self.buf.Append(JsonEmitter.Quote((*ep).key));
       self.buf.Append(":");
       self.EmitJson((*ep).value);
     }
@@ -362,9 +365,9 @@ method(JsonEmitter) EmitJson(node: Json) -> void {
     if iv != nil {
       let n: JsonInt = iv as JsonInt;
       if n.is_unsigned {
-        self.buf.Append(JsonU64Text(n.unsigned_value));
+        self.buf.Append((n.unsigned_value).ToString());
       } else {
-        self.buf.Append(JsonI64Text(n.value));
+        self.buf.Append((n.value).ToString());
       }
     }
 
@@ -384,7 +387,7 @@ method(JsonEmitter) EmitJson(node: Json) -> void {
     let sv: JsonStr? = node.node.get_if<JsonStr>();
     if sv != nil {
       let s: JsonStr = sv as JsonStr;
-      self.buf.Append(json_emit_quote(copy(s.value)));
+      self.buf.Append(JsonEmitter.Quote(copy(s.value)));
     }
 
     return;
@@ -413,19 +416,12 @@ method(JsonEmitter) EmitJson(node: Json) -> void {
 
 /**
  * @brief Serialize `node` to compact toolchain JSON (insertion-order objects).
+ * @returns Language-owned compact text in insertion order.
  * @note Product entry is `JsonWriter.Emit` (json.md §0.4 / §1.5); this is the shared body.
  */
-pub func JsonEmitText(node: Json) -> string {
+pub static method(JsonEmitter) Emit(node: Json) -> string {
   var em: JsonEmitter = JsonEmitter{buf: StringBuffer.NewWithCapacity(64)};
   em.EmitJson(node);
 
   return em.buf.Take();
-}
-
-/**
- * @brief Compare document node kinds and retained scalar/collection contents.
- * @returns True when the JSON trees match structurally and by value.
- */
-pub func JsonTreesEqual(a: Json, b: Json) -> bool {
-  return json_trees_equal(a, b);
 }

@@ -5,15 +5,14 @@ part of JsonTests;
 
 /**
  * @brief JsonDocument build / query / durable-vs-scratch ownership tests (m_v0.19_p2).
- * @note MemStack/MemArena scratch helpers: `json_scratch_from_stack` / `json_scratch_from_arena`
- *   (defined in `reader_selftest.ny`, same JsonTypes module).
+ * @note Scratch strategy views use kernel MemStack.AsAllocator / MemArena.AsAllocator.
  * @see docs/design/stdlib/json.md §0.5–0.6
  */
 
 @test
 func test_json_document_empty_is_error() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse("", durable, scratch);
   AssertTrue(r.IsErr());
   let eo: JsonError? = r.get_if<JsonError>();
@@ -24,15 +23,15 @@ func test_json_document_empty_is_error() {
 
 @test
 func test_json_document_query_object_name() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse("{\"name\":\"x\"}", durable, scratch);
   AssertTrue(r.IsOk());
   let doc_opt: JsonDocument? = r.get_if<JsonDocument>();
   AssertTrue(doc_opt != nil);
   var doc: JsonDocument = doc_opt as JsonDocument;
   let root: Json = doc.Root();
-  let obj_opt: JsonObject? = JsonAsObject(root);
+  let obj_opt: JsonObject? = root.AsObject();
   AssertTrue(obj_opt != nil);
   var objv: JsonObject = obj_opt as JsonObject;
   AssertEqI32(objv.Len(), 1);
@@ -52,7 +51,7 @@ func test_json_document_query_object_name() {
   let doc2_opt: JsonDocument? = r2.get_if<JsonDocument>();
   AssertTrue(doc2_opt != nil);
   var doc2: JsonDocument = doc2_opt as JsonDocument;
-  let obj2_opt: JsonObject? = JsonAsObject(doc2.Root());
+  let obj2_opt: JsonObject? = (doc2.Root()).AsObject();
   AssertTrue(obj2_opt != nil);
   var obj2: JsonObject = obj2_opt as JsonObject;
   let name_node: Json? = obj2.Get("name");
@@ -66,8 +65,8 @@ func test_json_document_query_object_name() {
 
 @test
 func test_json_document_query_array_scalars() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(
     "[true, false, null, 42, \"hi\"]",
     durable,
@@ -78,7 +77,7 @@ func test_json_document_query_array_scalars() {
   AssertTrue(doc_opt != nil);
   var doc: JsonDocument = doc_opt as JsonDocument;
   let root: Json = doc.Root();
-  let arr_opt: JsonArray? = JsonAsArray(root);
+  let arr_opt: JsonArray? = root.AsArray();
   AssertTrue(arr_opt != nil);
   var arrv: JsonArray = arr_opt as JsonArray;
   AssertEqI32(arrv.Len(), 5);
@@ -102,7 +101,7 @@ func test_json_document_query_array_scalars() {
   let i3: Json? = arrv.Get(3);
   AssertTrue(i3 != nil);
   let v3: Json = i3 as Json;
-  let iv: int64? = JsonAsInt(v3);
+  let iv: int64? = v3.AsInt();
   AssertTrue(iv != nil);
   AssertEqI64(iv as int64, 42 as int64);
   let ji_opt: JsonInt? = v3.node.get_if<JsonInt>();
@@ -122,8 +121,8 @@ func test_json_document_query_array_scalars() {
 
 @test
 func test_json_document_query_nested_object() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(
     "{\"dependencies\":{\"stdlib\":{\"path\":\"../stdlib\"}}}",
     durable,
@@ -134,17 +133,17 @@ func test_json_document_query_nested_object() {
   AssertTrue(doc_opt != nil);
   var doc: JsonDocument = doc_opt as JsonDocument;
   let root: Json = doc.Root();
-  let obj_opt: JsonObject? = JsonAsObject(root);
+  let obj_opt: JsonObject? = root.AsObject();
   AssertTrue(obj_opt != nil);
   var objv: JsonObject = obj_opt as JsonObject;
   let deps_n: Json? = objv.Get("dependencies");
   AssertTrue(deps_n != nil);
-  let deps_obj: JsonObject? = JsonAsObject(deps_n as Json);
+  let deps_obj: JsonObject? = (deps_n as Json).AsObject();
   AssertTrue(deps_obj != nil);
   var dm: JsonObject = deps_obj as JsonObject;
   let std_n: Json? = dm.Get("stdlib");
   AssertTrue(std_n != nil);
-  let std_obj: JsonObject? = JsonAsObject(std_n as Json);
+  let std_obj: JsonObject? = (std_n as Json).AsObject();
   AssertTrue(std_obj != nil);
   var sm: JsonObject = std_obj as JsonObject;
   let path_n: Json? = sm.Get("path");
@@ -157,8 +156,8 @@ func test_json_document_query_nested_object() {
 
 @test
 func test_json_document_array_of_objects_with_scalars() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(
     "{\"Types\":[{\"ID\":1,\"Name\":\"int32\"}]}",
     durable,
@@ -168,26 +167,26 @@ func test_json_document_array_of_objects_with_scalars() {
   let doc_opt: JsonDocument? = r.get_if<JsonDocument>();
   AssertTrue(doc_opt != nil);
   let doc: JsonDocument = doc_opt as JsonDocument;
-  let root_opt: JsonObject? = JsonAsObject(doc.Root());
+  let root_opt: JsonObject? = (doc.Root()).AsObject();
   AssertTrue(root_opt != nil);
   let root: JsonObject = root_opt as JsonObject;
   let types_node: Json? = root.Get("Types");
   AssertTrue(types_node != nil);
-  let types_opt: JsonArray? = JsonAsArray(types_node as Json);
+  let types_opt: JsonArray? = (types_node as Json).AsArray();
   AssertTrue(types_opt != nil);
   let item_node: Json? = (types_opt as JsonArray).Get(0);
   AssertTrue(item_node != nil);
-  let item_opt: JsonObject? = JsonAsObject(item_node as Json);
+  let item_opt: JsonObject? = (item_node as Json).AsObject();
   AssertTrue(item_opt != nil);
   let id: Json? = (item_opt as JsonObject).Get("ID");
   AssertTrue(id != nil);
-  AssertEqI64(JsonAsInt(id as Json) as int64, 1 as int64);
+  AssertEqI64((id as Json).AsInt() as int64, 1 as int64);
 }
 
 @test
 func test_json_document_parse_error() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse("{\"a\":1,\"a\":2}", durable, scratch);
   AssertTrue(r.IsErr());
   let eo: JsonError? = r.get_if<JsonError>();
@@ -203,9 +202,9 @@ func test_json_document_memstack_scratch_reset_durable() {
   AssertTrue(chunk != (ptr<int8>.null()));
   var stack: MemStack = MemStack{};
   stack.Init(chunk as *mut uint8, 8192 as uintptr);
-  let scratch: Allocator = json_scratch_from_stack(stack);
+  let scratch: Allocator = stack.AsAllocator();
   let mark: uintptr = stack.Mark();
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
 
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(
     "{\"a\":1,\"b\":\"two\"}",
@@ -220,7 +219,7 @@ func test_json_document_memstack_scratch_reset_durable() {
   stack.Reset(mark);
 
   let root: Json = doc.Root();
-  let obj_opt: JsonObject? = JsonAsObject(root);
+  let obj_opt: JsonObject? = root.AsObject();
   AssertTrue(obj_opt != nil);
   var objv: JsonObject = obj_opt as JsonObject;
   AssertEqI32(objv.Len(), 2);
@@ -238,7 +237,7 @@ func test_json_document_memstack_scratch_reset_durable() {
   AssertEqString((sb as JsonStr).Text(), "two");
   let va: Json? = objv.Get("a");
   AssertTrue(va != nil);
-  let ia: int64? = JsonAsInt(va as Json);
+  let ia: int64? = (va as Json).AsInt();
   AssertTrue(ia != nil);
   AssertEqI64(ia as int64, 1 as int64);
   // Scratch reusable after Reset; Document still valid.
@@ -248,7 +247,7 @@ func test_json_document_memstack_scratch_reset_durable() {
   AssertTrue(doc2_opt != nil);
   var doc2: JsonDocument = doc2_opt as JsonDocument;
   let root2: Json = doc2.Root();
-  let o2_opt: JsonObject? = JsonAsObject(root2);
+  let o2_opt: JsonObject? = root2.AsObject();
   AssertTrue(o2_opt != nil);
   var o2: JsonObject = o2_opt as JsonObject;
   let xv: Json? = o2.Get("x");
@@ -259,7 +258,7 @@ func test_json_document_memstack_scratch_reset_durable() {
   AssertEqString((xs as JsonStr).Text(), "y");
   // Original document still queryable after second Parse reused scratch.
   let root_again: Json = doc.Root();
-  let obj_again_opt: JsonObject? = JsonAsObject(root_again);
+  let obj_again_opt: JsonObject? = root_again.AsObject();
   AssertTrue(obj_again_opt != nil);
   var obj_again: JsonObject = obj_again_opt as JsonObject;
   let k_again: string? = obj_again.KeyAt(0);
@@ -276,8 +275,8 @@ func test_json_document_memarena_scratch_reset_durable() {
   AssertTrue(chunk != (ptr<int8>.null()));
   var arena: MemArena = MemArena{};
   arena.Init(chunk as *mut uint8, 8192 as uintptr);
-  let scratch: Allocator = json_scratch_from_arena(arena);
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  let scratch: Allocator = arena.AsAllocator();
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
 
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(
     "{\"name\":\"pkg\",\"version\":1}",
@@ -292,7 +291,7 @@ func test_json_document_memarena_scratch_reset_durable() {
   arena.ResetAll();
 
   let root: Json = doc.Root();
-  let obj_opt: JsonObject? = JsonAsObject(root);
+  let obj_opt: JsonObject? = root.AsObject();
   AssertTrue(obj_opt != nil);
   var objv: JsonObject = obj_opt as JsonObject;
   let name_n: Json? = objv.Get("name");
@@ -303,7 +302,7 @@ func test_json_document_memarena_scratch_reset_durable() {
   AssertEqString((name_s as JsonStr).Text(), "pkg");
   let ver_n: Json? = objv.Get("version");
   AssertTrue(ver_n != nil);
-  let ver_i: int64? = JsonAsInt(ver_n as Json);
+  let ver_i: int64? = (ver_n as Json).AsInt();
   AssertTrue(ver_i != nil);
   AssertEqI64(ver_i as int64, 1 as int64);
 
@@ -313,16 +312,16 @@ func test_json_document_memarena_scratch_reset_durable() {
 
 @test
 func test_json_document_parsefile_sample() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.ParseFile(
-    json_resolve_testdata("tests/data/doc_sample.json"),
+    JsonFixture.Resolve("tests/data/doc_sample.json").path,
     durable,
     scratch
   );
   if !r.IsOk() {
     let r2: Result<JsonDocument, JsonError> = JsonDocument.ParseFile(
-      json_resolve_testdata("tests/data/doc_sample.json"),
+      JsonFixture.Resolve("tests/data/doc_sample.json").path,
       durable,
       scratch
     );
@@ -331,7 +330,7 @@ func test_json_document_parsefile_sample() {
     AssertTrue(doc_opt != nil);
     var doc: JsonDocument = doc_opt as JsonDocument;
     let root: Json = doc.Root();
-    let obj_opt: JsonObject? = JsonAsObject(root);
+    let obj_opt: JsonObject? = root.AsObject();
     AssertTrue(obj_opt != nil);
     var objv: JsonObject = obj_opt as JsonObject;
     let name_n: Json? = objv.Get("name");
@@ -347,7 +346,7 @@ func test_json_document_parsefile_sample() {
   AssertTrue(doc_opt != nil);
   var doc: JsonDocument = doc_opt as JsonDocument;
   let root: Json = doc.Root();
-  let obj_opt: JsonObject? = JsonAsObject(root);
+  let obj_opt: JsonObject? = root.AsObject();
   AssertTrue(obj_opt != nil);
   var objv: JsonObject = obj_opt as JsonObject;
   let name_n: Json? = objv.Get("name");
@@ -360,19 +359,19 @@ func test_json_document_parsefile_sample() {
 
 @test
 func test_json_uint64_full_range_roundtrip() {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let parsed: Result<JsonDocument, JsonError> = JsonDocument.Parse(
     "{\"id\":18446744073709551615}", durable, scratch);
   AssertTrue(parsed.IsOk());
   let doc_opt: JsonDocument? = parsed.get_if<JsonDocument>();
   AssertTrue(doc_opt != nil);
   let root: Json = (doc_opt as JsonDocument).Root();
-  let object_opt: JsonObject? = JsonAsObject(root);
+  let object_opt: JsonObject? = root.AsObject();
   AssertTrue(object_opt != nil);
   let id_opt: Json? = (object_opt as JsonObject).Get("id");
   AssertTrue(id_opt != nil);
-  let value_opt: uint64? = JsonAsUInt64(id_opt as Json);
+  let value_opt: uint64? = (id_opt as Json).AsUInt64();
   AssertTrue(value_opt != nil && (value_opt as uint64) == 18446744073709551615u64);
   let encoded: string = JsonWriter.Emit(root);
   AssertTrue(encoded == "{\"id\":18446744073709551615}");
@@ -380,7 +379,7 @@ func test_json_uint64_full_range_roundtrip() {
   AssertTrue(reparsed.IsOk());
   let reparsed_opt: JsonDocument? = reparsed.get_if<JsonDocument>();
   AssertTrue(reparsed_opt != nil);
-  let reparsed_id: Json? = (JsonAsObject((reparsed_opt as JsonDocument).Root()) as JsonObject).Get("id");
+  let reparsed_id: Json? = (((reparsed_opt as JsonDocument).Root()).AsObject() as JsonObject).Get("id");
   AssertTrue(reparsed_id != nil);
-  AssertTrue((JsonAsUInt64(reparsed_id as Json) as uint64) == 18446744073709551615u64);
+  AssertTrue(((reparsed_id as Json).AsUInt64() as uint64) == 18446744073709551615u64);
 }

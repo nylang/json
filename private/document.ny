@@ -51,80 +51,19 @@ struct JsonDomBuilder implements JsonHandler {
   st: *mut JsonDomState;
 }
 
-func json_null_node() -> Json {
-  return Json{node: JsonNull{_pad: 0}};
-}
-
-func json_bool_node(v: bool) -> Json {
-  return Json{node: JsonBool{value: v}};
-}
-
-func json_int_node(v: int64) -> Json {
-  return JsonFromInt(v);
-}
-
-func json_str_node(v: string) -> Json {
-  return Json{node: JsonStr{value: v}};
-}
-
-func json_doc_fail(line: int32, column: int32, message: string) -> Result<JsonDocument, JsonError> {
-  var msg: string = message;
-  if message.length > 0 {
-    var out: string = string.Alloc(message.length);
-    memcpy((out.data as *mut uint8), message.data, message.length as uintptr);
-    msg = out;
-  }
-
-  let err: JsonError = JsonError{line: line, column: column, message: msg};
-
-  return Err<JsonDocument, JsonError>(err);
-}
-
-func json_dom_fail() -> Result<JsonDocument, JsonError> {
-  return json_doc_fail(1, 1, "document build failed");
-}
-
-func json_doc_ok(doc: JsonDocument) -> Result<JsonDocument, JsonError> {
-  return Ok<JsonDocument, JsonError>(doc);
-}
-
-func json_doc_io_kind(e: IoError) -> string {
-  if e == IoError.NotFound {
-    return "file not found";
-  }
-
-  if e == IoError.PermissionDenied {
-    return "permission denied";
-  }
-
-  if e == IoError.IsADirectory {
-    return "path is a directory";
-  }
-
-  if e == IoError.NotADirectory {
-    return "path is not a directory";
-  }
-
-  if e == IoError.InvalidArgument {
-    return "invalid path";
-  }
-
-  return "I/O error";
-}
-
 /**
  * @brief Copy `s` into `durable` and adopt as a heap string (survives scratch Reset).
  * @note Requires process-heap durable (`CreateAllocator`); drop frees via `_nyra_*`.
  */
-func json_durable_copy(durable: Allocator, s: string) -> string {
+method(JsonDomState) CopyDurable(s: string) -> string {
   if s.length <= 0 {
-    return JsonEmptyStr();
+    return "";
   }
 
   let n: uintptr = s.length as uintptr;
-  let p: *mut uint8 = durable.Alloc(n);
+  let p: *mut uint8 = self.durable.Alloc(n);
   if p == (ptr<uint8>.null()) {
-    return JsonEmptyStr();
+    return "";
   }
 
   memcpy(p, s.data as *const uint8, n);
@@ -137,7 +76,7 @@ func json_durable_copy(durable: Allocator, s: string) -> string {
  *   string for every JSON object entry.
  * @note Unknown user keys still get copied into the document's durable arena.
  */
-func json_dom_static_key(key: string) -> string? {
+static method(JsonDomState) StaticKey(key: string) -> string? {
   if key == "ABI" {
     return "ABI";
   }
@@ -353,43 +292,43 @@ func json_dom_static_key(key: string) -> string? {
   return nil;
 }
 
-func json_dom_state_new(durable: Allocator) -> JsonDomState {
+static method(JsonDomState) New(durable: Allocator) -> JsonDomState {
   return JsonDomState{
     durable: durable,
     top: ptr<JsonDomFrame>.null(),
     depth: 0,
-    root: json_null_node(),
+    root: Json{node: JsonNull{_pad: 0}},
     has_root: false,
     failed: false
   };
 }
 
-func json_dom_empty_object(durable: Allocator) -> JsonObject {
+static method(JsonObject) WithAllocator(durable: Allocator) -> JsonObject {
   return JsonObject{entries: Array<JsonObjectEntry>.NewWithAllocator(durable)};
 }
 
-func json_dom_empty_array(durable: Allocator) -> JsonArray {
+static method(JsonArray) WithAllocator(durable: Allocator) -> JsonArray {
   return JsonArray{items: Array<Json>.NewWithAllocator(durable)};
 }
 
-func json_dom_frame_alloc(
+static method(JsonDomFrame) Allocate(
   durable: Allocator,
   is_object: bool,
   prev: *mut JsonDomFrame
 ) -> *mut JsonDomFrame {
   let nbytes: int64 = sizeof(JsonDomFrame) as int64;
-  let raw: *mut int8 = _nyra_malloc(nbytes, 8 as int64);
+  let raw: *mut int8 = _nyra_malloc(nbytes, 8i64);
   if raw == (ptr<int8>.null()) {
     return ptr<JsonDomFrame>.null();
   }
 
-  memset(raw as *mut uint8, 0 as uint8, nbytes as uintptr);
+  memset(raw as *mut uint8, 0u8, nbytes as uintptr);
   let fp: *mut JsonDomFrame = cast<JsonDomFrame>.pointer(raw);
   unsafe {
     (*fp).is_object = is_object;
-    (*fp).object = json_dom_empty_object(durable);
-    (*fp).array = json_dom_empty_array(durable);
-    (*fp).pending_key = JsonEmptyStr();
+    (*fp).object = JsonObject.WithAllocator(durable);
+    (*fp).array = JsonArray.WithAllocator(durable);
+    (*fp).pending_key = "";
     (*fp).has_pending_key = false;
     (*fp).prev = prev;
   }
@@ -397,13 +336,13 @@ func json_dom_frame_alloc(
   return fp;
 }
 
-func json_dom_frame_free(fp: *mut JsonDomFrame) -> void {
+static method(JsonDomFrame) Release(fp: *mut JsonDomFrame) -> void {
   if fp == (ptr<JsonDomFrame>.null()) {
     return;
   }
 
   unsafe {
-    (*fp).pending_key = JsonEmptyStr();
+    (*fp).pending_key = "";
     (*fp).object = JsonObject{entries: Array<JsonObjectEntry>{}};
     (*fp).array = JsonArray{items: Array<Json>{}};
     (*fp).prev = ptr<JsonDomFrame>.null();
@@ -412,75 +351,75 @@ func json_dom_frame_free(fp: *mut JsonDomFrame) -> void {
   _nyra_free(cast<int8>.pointer(fp));
 }
 
-func json_dom_clear_stack(st: *mut JsonDomState) -> void {
+method(JsonDomState) ClearStack() -> void {
   unsafe {
-    var cur: *mut JsonDomFrame = (*st).top;
+    var cur: *mut JsonDomFrame = self.top;
     while cur != (ptr<JsonDomFrame>.null()) {
       let prev: *mut JsonDomFrame = (*cur).prev;
-      json_dom_frame_free(cur);
+      JsonDomFrame.Release(cur);
       cur = prev;
     }
 
-    (*st).top = ptr<JsonDomFrame>.null();
-    (*st).depth = 0;
+    self.top = ptr<JsonDomFrame>.null();
+    self.depth = 0;
   }
 }
 
-func json_dom_push_object(st: *mut JsonDomState) -> bool {
+method(JsonDomState) PushObject() -> bool {
   unsafe {
-    let fp: *mut JsonDomFrame = json_dom_frame_alloc((*st).durable, true,(*st).top);
+    let fp: *mut JsonDomFrame = JsonDomFrame.Allocate(self.durable, true,self.top);
     if fp == (ptr<JsonDomFrame>.null()) {
-      (*st).failed = true;
+      self.failed = true;
 
       return false;
     }
 
-    (*st).top = fp;
-    (*st).depth = (*st).depth + 1;
-  }
-
-  return true;
-}
-
-func json_dom_push_array(st: *mut JsonDomState) -> bool {
-  unsafe {
-    let fp: *mut JsonDomFrame = json_dom_frame_alloc((*st).durable, false,(*st).top);
-    if fp == (ptr<JsonDomFrame>.null()) {
-      (*st).failed = true;
-
-      return false;
-    }
-
-    (*st).top = fp;
-    (*st).depth = (*st).depth + 1;
+    self.top = fp;
+    self.depth = self.depth + 1;
   }
 
   return true;
 }
 
-func json_dom_add_value(st: *mut JsonDomState, v: Json) -> bool {
+method(JsonDomState) PushArray() -> bool {
   unsafe {
-    if (*st).failed {
+    let fp: *mut JsonDomFrame = JsonDomFrame.Allocate(self.durable, false,self.top);
+    if fp == (ptr<JsonDomFrame>.null()) {
+      self.failed = true;
+
       return false;
     }
 
-    let fp: *mut JsonDomFrame = (*st).top;
+    self.top = fp;
+    self.depth = self.depth + 1;
+  }
+
+  return true;
+}
+
+method(JsonDomState) AddValue(v: Json) -> bool {
+  unsafe {
+    if self.failed {
+      return false;
+    }
+
+    let fp: *mut JsonDomFrame = self.top;
     if fp == (ptr<JsonDomFrame>.null()) {
-      (*st).root = v;
-      (*st).has_root = true;
+      self.root = v;
+      self.has_root = true;
 
       return true;
     }
 
     if (*fp).is_object {
       if ! (*fp).has_pending_key {
-        (*st).failed = true;
+        self.failed = true;
 
         return false;
       }
 
       let key: string = move((*fp).pending_key);
-      (*fp).pending_key = JsonEmptyStr();
+      (*fp).pending_key = "";
       (*fp).has_pending_key = false;
       (*fp).object.entries.Push(JsonObjectEntry{key: move(key), value: move(v)});
 
@@ -493,17 +432,17 @@ func json_dom_add_value(st: *mut JsonDomState, v: Json) -> bool {
   }
 }
 
-func json_dom_end_object(st: *mut JsonDomState) -> bool {
+method(JsonDomState) EndObject() -> bool {
   unsafe {
-    let fp: *mut JsonDomFrame = (*st).top;
+    let fp: *mut JsonDomFrame = self.top;
     if fp == (ptr<JsonDomFrame>.null()) {
-      (*st).failed = true;
+      self.failed = true;
 
       return false;
     }
 
     if ! (*fp).is_object {
-      (*st).failed = true;
+      self.failed = true;
 
       return false;
     }
@@ -511,25 +450,25 @@ func json_dom_end_object(st: *mut JsonDomState) -> bool {
     let object: JsonObject = move((*fp).object);
     let node: Json = Json{node: move(object)};
     (*fp).object = JsonObject{entries: Array<JsonObjectEntry>{}};
-    (*st).top = (*fp).prev;
-    (*st).depth = (*st).depth - 1;
-    json_dom_frame_free(fp);
+    self.top = (*fp).prev;
+    self.depth = self.depth - 1;
+    JsonDomFrame.Release(fp);
 
-    return json_dom_add_value(st, move(node));
+    return self.AddValue(move(node));
   }
 }
 
-func json_dom_end_array(st: *mut JsonDomState) -> bool {
+method(JsonDomState) EndArray() -> bool {
   unsafe {
-    let fp: *mut JsonDomFrame = (*st).top;
+    let fp: *mut JsonDomFrame = self.top;
     if fp == (ptr<JsonDomFrame>.null()) {
-      (*st).failed = true;
+      self.failed = true;
 
       return false;
     }
 
     if (*fp).is_object {
-      (*st).failed = true;
+      self.failed = true;
 
       return false;
     }
@@ -537,64 +476,74 @@ func json_dom_end_array(st: *mut JsonDomState) -> bool {
     let items: JsonArray = move((*fp).array);
     let node: Json = Json{node: move(items)};
     (*fp).array = JsonArray{items: Array<Json>{}};
-    (*st).top = (*fp).prev;
-    (*st).depth = (*st).depth - 1;
-    json_dom_frame_free(fp);
+    self.top = (*fp).prev;
+    self.depth = self.depth - 1;
+    JsonDomFrame.Release(fp);
 
-    return json_dom_add_value(st, move(node));
+    return self.AddValue(move(node));
   }
 }
 
 method(JsonDomBuilder) Null() -> bool {
-  return json_dom_add_value(self.st, json_null_node());
+  unsafe {
+    return (*self.st).AddValue(Json{node: JsonNull{_pad: 0}});
+  }
 }
 
 method(JsonDomBuilder) Bool(b: bool) -> bool {
-  return json_dom_add_value(self.st, json_bool_node(b));
+  unsafe {
+    return (*self.st).AddValue(Json.FromBool(b));
+  }
 }
 
 method(JsonDomBuilder) Int64(v: int64) -> bool {
-  return json_dom_add_value(self.st, json_int_node(v));
+  unsafe {
+    return (*self.st).AddValue(Json.FromInt(v));
+  }
 }
 
 method(JsonDomBuilder) UInt64(v: uint64) -> bool {
-  return json_dom_add_value(self.st, JsonFromUInt64(v));
+  unsafe {
+    return (*self.st).AddValue(Json.FromUInt64(v));
+  }
 }
 
 method(JsonDomBuilder) Number(raw: string) -> bool {
   unsafe {
-    if !JsonNumberIsValid(raw) {
+    if !JsonNumber.IsValid(raw) {
       (*self.st).failed = true;
 
       return false;
     }
 
-    let heap_raw: string = json_durable_copy((*self.st).durable, raw);
+    let heap_raw: string = (*self.st).CopyDurable(raw);
     if (raw.length > 0) && (heap_raw.length <= 0) {
       (*self.st).failed = true;
 
       return false;
     }
 
-    return json_dom_add_value(self.st, Json{node: JsonNumber{value: heap_raw}});
-  }
+    return (*self.st).AddValue(Json{node: JsonNumber{value: heap_raw}});
+    }
 }
 
 method(JsonDomBuilder) String(s: string) -> bool {
   unsafe {
-    let heap_s: string = json_durable_copy((*self.st).durable, s);
+    let heap_s: string = (*self.st).CopyDurable(s);
     if (s.length > 0) && (heap_s.length <= 0) {
       (*self.st).failed = true;
 
       return false;
     }
 
-    return json_dom_add_value(self.st, json_str_node(heap_s));
-  }
+    return (*self.st).AddValue(Json{node: JsonStr{value: heap_s}});
+    }
 }
 
 method(JsonDomBuilder) StartObject() -> bool {
-  return json_dom_push_object(self.st);
+  unsafe {
+    return (*self.st).PushObject();
+  }
 }
 
 method(JsonDomBuilder) Key(k: string) -> bool {
@@ -612,12 +561,12 @@ method(JsonDomBuilder) Key(k: string) -> bool {
       return false;
     }
 
-    let static_key: string? = json_dom_static_key(k);
-    var heap_k: string = JsonEmptyStr();
+    let static_key: string? = JsonDomState.StaticKey(k);
+    var heap_k: string = "";
     if static_key != nil {
       heap_k = static_key as string;
     } else {
-      heap_k = json_durable_copy((*self.st).durable, k);
+      heap_k = (*self.st).CopyDurable(k);
       if (k.length > 0) && (heap_k.length <= 0) {
         (*self.st).failed = true;
 
@@ -633,19 +582,25 @@ method(JsonDomBuilder) Key(k: string) -> bool {
 }
 
 method(JsonDomBuilder) EndObject(member_count: int32) -> bool {
-  let _mc: int32 = member_count;
+  unsafe {
+    let _mc: int32 = member_count;
 
-  return json_dom_end_object(self.st);
+    return (*self.st).EndObject();
+  }
 }
 
 method(JsonDomBuilder) StartArray() -> bool {
-  return json_dom_push_array(self.st);
+  unsafe {
+    return (*self.st).PushArray();
+  }
 }
 
 method(JsonDomBuilder) EndArray(element_count: int32) -> bool {
-  let _ec: int32 = element_count;
+  unsafe {
+    let _ec: int32 = element_count;
 
-  return json_dom_end_array(self.st);
+    return (*self.st).EndArray();
+  }
 }
 
 /**
@@ -663,46 +618,46 @@ pub static method(JsonDocument) Parse(
   durable: Allocator,
   scratch: Allocator
 ) -> Result<JsonDocument, JsonError> {
-  let frame: *mut uint8 = durable.Alloc(1 as uintptr);
+  let frame: *mut uint8 = durable.Alloc(1up);
   if frame == (ptr<uint8>.null()) {
-    return json_doc_fail(1, 1, "durable allocator exhausted");
+    return Err<JsonDocument, JsonError>(JsonError.New(1, 1, "durable allocator exhausted"));
   }
 
-  var state: JsonDomState = json_dom_state_new(durable);
+  var state: JsonDomState = JsonDomState.New(durable);
   let stp: *mut JsonDomState = cast<JsonDomState>.pointer(& mut state);
   var builder: JsonDomBuilder = JsonDomBuilder{st: stp};
   var reader: JsonReader = JsonReader.New();
   let r: Result<Unit, JsonError> = reader.Parse(text, builder, scratch);
   if r.IsErr() {
-    json_dom_clear_stack(stp);
+    state.ClearStack();
     let eo: JsonError? = r.get_if<JsonError>();
     if eo == nil {
-      return json_doc_fail(1, 1, "parse failed");
+      return Err<JsonDocument, JsonError>(JsonError.New(1, 1, "parse failed"));
     }
 
     let e: JsonError = eo as JsonError;
 
-    return json_doc_fail(e.line, e.column, e.message);
+    return Err<JsonDocument, JsonError>(JsonError.New(e.line, e.column, e.message));
   }
 
   unsafe {
     if (*stp).failed || ! (*stp).has_root {
-      json_dom_clear_stack(stp);
+      state.ClearStack();
 
-      return json_dom_fail();
+      return Err<JsonDocument, JsonError>(JsonError.New(1, 1, "document build failed"));
     }
 
     if (*stp).depth != 0 {
-      json_dom_clear_stack(stp);
+      state.ClearStack();
 
-      return json_dom_fail();
+      return Err<JsonDocument, JsonError>(JsonError.New(1, 1, "document build failed"));
     }
 
     let doc: JsonDocument = JsonDocument{root:(*stp).root};
     (*stp).has_root = false;
-    (*stp).root = json_null_node();
+    (*stp).root = Json{node: JsonNull{_pad: 0}};
 
-    return json_doc_ok(doc);
+    return Ok<JsonDocument, JsonError>(doc);
   }
 }
 
@@ -722,17 +677,17 @@ pub static method(JsonDocument) ParseFile(
   if rd.IsErr() {
     let eo: IoError? = rd.get_if<IoError>();
     if eo == nil {
-      return json_doc_fail(0, 0, "I/O error reading JSON file: ".Concat(path));
+      return Err<JsonDocument, JsonError>(JsonError.New(0, 0, "I/O error reading JSON file: ".Concat(path)));
     }
 
-    let msg: string = json_doc_io_kind(eo as IoError).Concat(" reading JSON file: ").Concat(path);
+    let msg: string = JsonError.IoDescription(eo as IoError).Concat(" reading JSON file: ").Concat(path);
 
-    return json_doc_fail(0, 0, msg);
+    return Err<JsonDocument, JsonError>(JsonError.New(0, 0, msg));
   }
 
   let text_opt: string? = rd.get_if<string>();
   if text_opt == nil {
-    return json_doc_fail(0, 0, "I/O error reading JSON file: ".Concat(path));
+    return Err<JsonDocument, JsonError>(JsonError.New(0, 0, "I/O error reading JSON file: ".Concat(path)));
   }
 
   let src: string = text_opt as string;

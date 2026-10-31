@@ -25,13 +25,13 @@ pub struct JsonWriter {
  * @brief Publish one DOM node as Handler events (child walk; free helper).
  * @note Key/String temps are scratch-backed views (Document copies into durable).
  */
-func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> bool {
-  if node.node.holds<JsonNull>() {
+method(Json) Publish(handler: JsonHandler, scratch: Allocator) -> bool {
+  if self.node.holds<JsonNull>() {
     return handler.Null();
   }
 
-  if node.node.holds<JsonBool>() {
-    let bv: JsonBool? = node.node.get_if<JsonBool>();
+  if self.node.holds<JsonBool>() {
+    let bv: JsonBool? = self.node.get_if<JsonBool>();
     if bv == nil {
       return handler.Null();
     }
@@ -41,8 +41,8 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     return handler.Bool(b.value);
   }
 
-  if node.node.holds<JsonInt>() {
-    let iv: JsonInt? = node.node.get_if<JsonInt>();
+  if self.node.holds<JsonInt>() {
+    let iv: JsonInt? = self.node.get_if<JsonInt>();
     if iv == nil {
       return handler.Null();
     }
@@ -55,13 +55,14 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     return handler.Int64(n.value);
   }
 
-  if node.node.holds<JsonNumber>() {
-    let number: JsonNumber? = node.node.get_if<JsonNumber>();
+  if self.node.holds<JsonNumber>() {
+    let number: JsonNumber? = self.node.get_if<JsonNumber>();
     if number == nil {
       return handler.Null();
     }
 
-    let raw: string = JsonScratchCopy(scratch,(number as JsonNumber).value);
+    let copied_raw: string? = scratch.CopyStringView((number as JsonNumber).value);
+    let raw: string = copied_raw != nil ? copied_raw as string : "";
     if raw.length != (number as JsonNumber).value.length {
       return false;
     }
@@ -69,14 +70,15 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     return handler.Number(raw);
   }
 
-  if node.node.holds<JsonStr>() {
-    let sv: JsonStr? = node.node.get_if<JsonStr>();
+  if self.node.holds<JsonStr>() {
+    let sv: JsonStr? = self.node.get_if<JsonStr>();
     if sv == nil {
       return handler.Null();
     }
 
     let s: JsonStr = sv as JsonStr;
-    let view: string = JsonScratchCopy(scratch, s.value);
+    let copied_view: string? = scratch.CopyStringView(s.value);
+    let view: string = copied_view != nil ? copied_view as string : "";
     if (s.value.length > 0) && (view.length <= 0) {
       return false;
     }
@@ -84,8 +86,8 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     return handler.String(view);
   }
 
-  if node.node.holds<JsonArray>() {
-    let arr_opt: JsonArray? = node.node.get_if<JsonArray>();
+  if self.node.holds<JsonArray>() {
+    let arr_opt: JsonArray? = self.node.get_if<JsonArray>();
     if arr_opt == nil {
       return handler.Null();
     }
@@ -100,7 +102,7 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     while i < n {
       unsafe {
         let ip: *mut Json = &mut arrv.items.buf[i];
-        if !json_publish_node(*ip, handler, scratch) {
+        if !(*ip).Publish(handler, scratch) {
           return false;
         }
       }
@@ -111,8 +113,8 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     return handler.EndArray(n);
   }
 
-  if node.node.holds<JsonObject>() {
-    let obj_opt: JsonObject? = node.node.get_if<JsonObject>();
+  if self.node.holds<JsonObject>() {
+    let obj_opt: JsonObject? = self.node.get_if<JsonObject>();
     if obj_opt == nil {
       return handler.Null();
     }
@@ -127,7 +129,8 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
     while i < n {
       unsafe {
         let ep: *mut JsonObjectEntry = &mut objv.entries.buf[i];
-        let kview: string = JsonScratchCopy(scratch,(*ep).key);
+        let copied_kview: string? = scratch.CopyStringView((*ep).key);
+        let kview: string = copied_kview != nil ? copied_kview as string : "";
         if ((*ep).key.length > 0) && (kview.length <= 0) {
           return false;
         }
@@ -136,7 +139,7 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
           return false;
         }
 
-        if !json_publish_node((*ep).value, handler, scratch) {
+        if !((*ep).value).Publish(handler, scratch) {
           return false;
         }
       }
@@ -155,7 +158,7 @@ func json_publish_node(node: Json, handler: JsonHandler, scratch: Allocator) -> 
  * @returns `false` if any Handler method aborts.
  */
 pub method(Json) Accept(handler: JsonHandler) -> bool {
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0i64, 8i64);
   if self.node.holds<JsonNull>() {
     return handler.Null();
   }
@@ -192,7 +195,8 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
     }
 
     let value: string = (number as JsonNumber).value;
-    let raw: string = JsonScratchCopy(scratch, value);
+    let copied_raw: string? = scratch.CopyStringView(value);
+    let raw: string = copied_raw != nil ? copied_raw as string : "";
     if raw.length != value.length {
       return false;
     }
@@ -207,7 +211,8 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
     }
 
     let s: JsonStr = sv as JsonStr;
-    let view: string = JsonScratchCopy(scratch, s.value);
+    let copied_view: string? = scratch.CopyStringView(s.value);
+    let view: string = copied_view != nil ? copied_view as string : "";
     if (s.value.length > 0) && (view.length <= 0) {
       return false;
     }
@@ -232,7 +237,7 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
       unsafe {
         let ip: *mut Json = &mut arrv.items.buf[i];
         // Child walk via free helper (not method(Json) self-pass).
-        if !json_publish_node(*ip, handler, scratch) {
+        if !(*ip).Publish(handler, scratch) {
           return false;
         }
       }
@@ -259,7 +264,8 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
     while i < n {
       unsafe {
         let ep: *mut JsonObjectEntry = &mut objv.entries.buf[i];
-        let kview: string = JsonScratchCopy(scratch,(*ep).key);
+        let copied_kview: string? = scratch.CopyStringView((*ep).key);
+        let kview: string = copied_kview != nil ? copied_kview as string : "";
         if ((*ep).key.length > 0) && (kview.length <= 0) {
           return false;
         }
@@ -268,7 +274,7 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
           return false;
         }
 
-        if !json_publish_node((*ep).value, handler, scratch) {
+        if !((*ep).value).Publish(handler, scratch) {
           return false;
         }
       }
@@ -289,22 +295,22 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
  */
 pub static method(JsonWriter) New() -> JsonWriter {
   // Heap shell for JsonDomState (peer yaml Writer.New 1024; keep headroom for Json root).
-  let nbytes: int64 = 4096 as int64;
-  let raw: *mut int8 = _nyra_malloc(nbytes, 8 as int64);
+  let nbytes: int64 = 4096;
+  let raw: *mut int8 = _nyra_malloc(nbytes, 8i64);
   if raw == (ptr<int8>.null()) {
     return JsonWriter{st: ptr<int8>.null()};
   }
 
   // Field assignment releases prior owned values. Establish an empty state
   // before assigning into freshly allocated, potentially recycled bytes.
-  memset(raw as *mut uint8, 0 as uint8, nbytes as uintptr);
+  memset(raw as *mut uint8, 0u8, nbytes as uintptr);
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(raw);
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0i64, 8i64);
   unsafe {
     (*sp).durable = durable;
     (*sp).top = ptr<JsonDomFrame>.null();
     (*sp).depth = 0;
-    (*sp).root = json_null_node();
+    (*sp).root = Json{node: JsonNull{_pad: 0}};
     (*sp).has_root = false;
     (*sp).failed = false;
   }
@@ -331,7 +337,7 @@ pub method(JsonWriter) GetString() -> string {
       return copy("null");
     }
 
-    return JsonEmitText((*sp).root);
+    return JsonEmitter.Emit((*sp).root);
   }
 }
 
@@ -367,7 +373,9 @@ pub method(JsonWriter) Null() -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_add_value(sp, json_null_node());
+  unsafe {
+    return (*sp).AddValue(Json{node: JsonNull{_pad: 0}});
+  }
 }
 
 /**
@@ -382,7 +390,9 @@ pub method(JsonWriter) Bool(b: bool) -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_add_value(sp, json_bool_node(b));
+  unsafe {
+    return (*sp).AddValue(Json.FromBool(b));
+  }
 }
 
 /**
@@ -397,7 +407,9 @@ pub method(JsonWriter) Int64(v: int64) -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_add_value(sp, json_int_node(v));
+  unsafe {
+    return (*sp).AddValue(Json.FromInt(v));
+  }
 }
 
 /**
@@ -412,7 +424,9 @@ pub method(JsonWriter) UInt64(v: uint64) -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_add_value(sp, JsonFromUInt64(v));
+  unsafe {
+    return (*sp).AddValue(Json.FromUInt64(v));
+  }
 }
 
 /**
@@ -421,20 +435,20 @@ pub method(JsonWriter) UInt64(v: uint64) -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) Number(raw: string) -> bool {
-  if self.st == (ptr<int8>.null()) || !JsonNumberIsValid(raw) {
+  if self.st == (ptr<int8>.null()) || !JsonNumber.IsValid(raw) {
     return false;
   }
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
   unsafe {
-    let heap_raw: string = json_durable_copy((*sp).durable, raw);
+    let heap_raw: string = (*sp).CopyDurable(raw);
     if (raw.length > 0) && (heap_raw.length <= 0) {
       (*sp).failed = true;
 
       return false;
     }
 
-    return json_dom_add_value(sp, Json{node: JsonNumber{value: heap_raw}});
+    return (*sp).AddValue(Json{node: JsonNumber{value: heap_raw}});
   }
 }
 
@@ -450,14 +464,14 @@ pub method(JsonWriter) String(s: string) -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
   unsafe {
-    let heap_s: string = json_durable_copy((*sp).durable, s);
+    let heap_s: string = (*sp).CopyDurable(s);
     if (s.length > 0) && (heap_s.length <= 0) {
       (*sp).failed = true;
 
       return false;
     }
 
-    return json_dom_add_value(sp, json_str_node(heap_s));
+    return (*sp).AddValue(Json{node: JsonStr{value: heap_s}});
   }
 }
 
@@ -473,7 +487,9 @@ pub method(JsonWriter) StartObject() -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_push_object(sp);
+  unsafe {
+    return (*sp).PushObject();
+  }
 }
 
 /**
@@ -501,7 +517,7 @@ pub method(JsonWriter) Key(k: string) -> bool {
       return false;
     }
 
-    let heap_k: string = json_durable_copy((*sp).durable, k);
+    let heap_k: string = (*sp).CopyDurable(k);
     if (k.length > 0) && (heap_k.length <= 0) {
       (*sp).failed = true;
 
@@ -528,7 +544,9 @@ pub method(JsonWriter) EndObject(member_count: int32) -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_end_object(sp);
+  unsafe {
+    return (*sp).EndObject();
+  }
 }
 
 /**
@@ -543,7 +561,9 @@ pub method(JsonWriter) StartArray() -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_push_array(sp);
+  unsafe {
+    return (*sp).PushArray();
+  }
 }
 
 /**
@@ -559,5 +579,7 @@ pub method(JsonWriter) EndArray(element_count: int32) -> bool {
 
   let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
 
-  return json_dom_end_array(sp);
+  unsafe {
+    return (*sp).EndArray();
+  }
 }

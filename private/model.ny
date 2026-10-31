@@ -125,8 +125,8 @@ pub method(JsonBool) Value() -> bool {
  * @brief Read a representable signed integer from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsInt(doc: Json) -> int64? {
-  let iv: JsonInt? = doc.node.get_if<JsonInt>();
+pub method(Json) AsInt() -> int64? {
+  let iv: JsonInt? = self.node.get_if<JsonInt>();
   if iv == nil {
     return nil;
   }
@@ -143,8 +143,8 @@ pub func JsonAsInt(doc: Json) -> int64? {
  * @brief Read a representable unsigned integer from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsUInt64(doc: Json) -> uint64? {
-  let value_opt: JsonInt? = doc.node.get_if<JsonInt>();
+pub method(Json) AsUInt64() -> uint64? {
+  let value_opt: JsonInt? = self.node.get_if<JsonInt>();
   if value_opt != nil {
     let value: JsonInt = value_opt as JsonInt;
     if value.is_unsigned {
@@ -152,7 +152,7 @@ pub func JsonAsUInt64(doc: Json) -> uint64? {
     }
 
     let signed: int64 = value.I64();
-    if signed >= 0 as int64 {
+    if signed >= 0i64 {
       return signed as uint64;
     }
   }
@@ -164,31 +164,31 @@ pub func JsonAsUInt64(doc: Json) -> uint64? {
  * @brief Read an exact numeric lexeme from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsNumber(doc: Json) -> string? {
-  let raw: JsonNumber? = doc.node.get_if<JsonNumber>();
+pub method(Json) AsNumber() -> string? {
+  let raw: JsonNumber? = self.node.get_if<JsonNumber>();
   if raw != nil {
     return copy((raw as JsonNumber).value);
   }
 
-  let integer: JsonInt? = doc.node.get_if<JsonInt>();
+  let integer: JsonInt? = self.node.get_if<JsonInt>();
   if integer == nil {
     return nil;
   }
 
   let value: JsonInt = integer as JsonInt;
   if value.is_unsigned {
-    return JsonU64Text(value.unsigned_value);
+    return (value.unsigned_value).ToString();
   }
 
-  return JsonI64Text(value.value);
+  return (value.value).ToString();
 }
 
 /**
  * @brief Read a boolean from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsBool(doc: Json) -> bool? {
-  let bv: JsonBool? = doc.node.get_if<JsonBool>();
+pub method(Json) AsBool() -> bool? {
+  let bv: JsonBool? = self.node.get_if<JsonBool>();
   if bv == nil {
     return nil;
   }
@@ -200,8 +200,8 @@ pub func JsonAsBool(doc: Json) -> bool? {
  * @brief Read a string from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsStr(doc: Json) -> string? {
-  let sv: JsonStr? = doc.node.get_if<JsonStr>();
+pub method(Json) AsStr() -> string? {
+  let sv: JsonStr? = self.node.get_if<JsonStr>();
   if sv == nil {
     return nil;
   }
@@ -215,24 +215,24 @@ pub func JsonAsStr(doc: Json) -> string? {
  * @brief Read an object from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsObject(doc: Json) -> JsonObject? {
-  return doc.node.get_if<JsonObject>();
+pub method(Json) AsObject() -> JsonObject? {
+  return self.node.get_if<JsonObject>();
 }
 
 /**
  * @brief Read an array from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsArray(doc: Json) -> JsonArray? {
-  return doc.node.get_if<JsonArray>();
+pub method(Json) AsArray() -> JsonArray? {
+  return self.node.get_if<JsonArray>();
 }
 
 /**
  * @brief Test whether a document node holds the null variant.
  * @returns True only for JsonNull; false for every other variant.
  */
-pub func JsonIsNull(doc: Json) -> bool {
-  let value: JsonNull? = doc.node.get_if<JsonNull>();
+pub method(Json) IsNull() -> bool {
+  let value: JsonNull? = self.node.get_if<JsonNull>();
 
   return value != nil;
 }
@@ -244,7 +244,7 @@ pub func JsonIsNull(doc: Json) -> bool {
  * @note Callers outside package `json` should use these (or `JsonWriter`) rather than `Json{
  *   node: … }` literals — host codegen NY6002 on `.node` in large importers.
  */
-pub func JsonFromBool(v: bool) -> Json {
+pub static method(Json) FromBool(v: bool) -> Json {
   return Json{node: JsonBool{value: v}};
 }
 
@@ -253,7 +253,7 @@ pub func JsonFromBool(v: bool) -> Json {
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromInt(v: int64) -> Json {
+pub static method(Json) FromInt(v: int64) -> Json {
   return Json{node: JsonInt{value: v, unsigned_value: 0u64, is_unsigned: false}};
 }
 
@@ -262,20 +262,20 @@ pub func JsonFromInt(v: int64) -> Json {
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromUInt64(v: uint64) -> Json {
+pub static method(Json) FromUInt64(v: uint64) -> Json {
   if v <= 9223372036854775807u64 {
-    return JsonFromInt(v as int64);
+    return Json.FromInt(v as int64);
   }
 
-  return Json{node: JsonInt{value: 0 as int64, unsigned_value: v, is_unsigned: true}};
+  return Json{node: JsonInt{value: 0i64, unsigned_value: v, is_unsigned: true}};
 }
 
 /**
  * @brief Construct an exact number node without rounding the original spelling.
  * @returns A retained numeric lexeme, or nil when raw is not valid JSON number syntax.
  */
-pub func JsonFromNumber(raw: string) -> Json? {
-  if !JsonNumberIsValid(raw) {
+pub static method(Json) FromNumber(raw: string) -> Json? {
+  if !JsonNumber.IsValid(raw) {
     return nil;
   }
 
@@ -287,7 +287,7 @@ pub func JsonFromNumber(raw: string) -> Json? {
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromStr(s: string) -> Json {
+pub static method(Json) FromStr(s: string) -> Json {
   return Json{node: JsonStr{value: copy(s)}};
 }
 
@@ -296,7 +296,7 @@ pub func JsonFromStr(s: string) -> Json {
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromArray(items: Array<Json>) -> Json {
+pub static method(Json) FromArray(items: Array<Json>) -> Json {
   return Json{node: JsonArray{items: items}};
 }
 
@@ -305,7 +305,7 @@ pub func JsonFromArray(items: Array<Json>) -> Json {
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromObject(entries: Array<JsonObjectEntry>) -> Json {
+pub static method(Json) FromObject(entries: Array<JsonObjectEntry>) -> Json {
   return Json{node: JsonObject{entries: entries}};
 }
 
@@ -363,4 +363,40 @@ pub method(JsonArray) Get(index: int32) -> Json? {
  */
 pub method(JsonArray) Len() -> int32 {
   return self.items.Len();
+}
+
+/**
+ * @brief Construct a retained JSON diagnostic independently of parser scratch storage.
+ * @returns A diagnostic owning its message bytes through language string lifetime.
+ */
+pub static method(JsonError) New(line: int32, column: int32, message: string) -> JsonError {
+  return JsonError{line: line, column: column, message: copy(message)};
+}
+
+/**
+ * @brief Describe an I/O failure in JSON file diagnostics.
+ * @returns Stable English detail without retaining platform error state.
+ */
+pub static method(JsonError) IoDescription(error: IoError) -> string {
+  if error == IoError.NotFound {
+    return "file not found";
+  }
+
+  if error == IoError.PermissionDenied {
+    return "permission denied";
+  }
+
+  if error == IoError.IsADirectory {
+    return "path is a directory";
+  }
+
+  if error == IoError.NotADirectory {
+    return "path is not a directory";
+  }
+
+  if error == IoError.InvalidArgument {
+    return "invalid path";
+  }
+
+  return "I/O error";
 }

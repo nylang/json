@@ -8,9 +8,9 @@ part of JsonTests;
  * @see docs/design/stdlib/json.md §0.4 · §1.5
  */
 
-func json_parse_tree(text: string) -> Json {
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+static method(JsonDocument) TestRoot(text: string) -> Json {
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(text, durable, scratch);
   if !r.IsOk() {
     return Json{node: JsonNull{_pad: 0}};
@@ -33,18 +33,18 @@ func test_json_writer_emit_null() {
 
 @test
 func test_json_writer_accept_roundtrip_name() {
-  let src: Json = json_parse_tree("{\"name\":\"x\"}");
+  let src: Json = JsonDocument.TestRoot("{\"name\":\"x\"}");
   let text: string = JsonWriter.Emit(src);
   AssertTrue(text.Contains("\"name\""));
   AssertTrue(text.Contains("\"x\""));
-  var durable: Allocator = CreateAllocator(0 as int64, 8 as int64);
-  var scratch: Allocator = CreateAllocator(0 as int64, 8 as int64);
+  var durable: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
+  var scratch: Allocator = Allocator.ProcessHeap(0 as int64, 8 as int64);
   let r: Result<JsonDocument, JsonError> = JsonDocument.Parse(text, durable, scratch);
   AssertTrue(r.IsOk());
   let doc_opt: JsonDocument? = r.get_if<JsonDocument>();
   AssertTrue(doc_opt != nil);
   var doc: JsonDocument = doc_opt as JsonDocument;
-  let obj_opt: JsonObject? = JsonAsObject(doc.Root());
+  let obj_opt: JsonObject? = (doc.Root()).AsObject();
   AssertTrue(obj_opt != nil);
   var objv: JsonObject = obj_opt as JsonObject;
   let name_node: Json? = objv.Get("name");
@@ -68,10 +68,10 @@ func test_json_writer_new_handler_get_string() {
 
 @test
 func test_json_accept_handler_events() {
-  var st: JsonEvState = json_ev_state_new();
+  var st: JsonEvState = JsonEvState.New();
   let stp: *mut JsonEvState = cast<JsonEvState>.pointer(& mut st);
   var rec: JsonEventRecorder = JsonEventRecorder{st: stp};
-  let node: Json = json_parse_tree("[true, null]");
+  let node: Json = JsonDocument.TestRoot("[true, null]");
   AssertTrue(node.Accept(rec));
   AssertTrue(st.kinds.Len() >= 4);
 }

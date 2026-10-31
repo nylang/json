@@ -373,49 +373,49 @@ pub method(JsonBool) Value() -> bool;
  * @brief Read a representable signed integer from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsInt(doc: Json) -> int64?;
+pub method(Json) AsInt() -> int64?;
 
 /**
  * @brief Read a representable unsigned integer from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsUInt64(doc: Json) -> uint64?;
+pub method(Json) AsUInt64() -> uint64?;
 
 /**
  * @brief Read an exact numeric lexeme from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsNumber(doc: Json) -> string?;
+pub method(Json) AsNumber() -> string?;
 
 /**
  * @brief Read a boolean from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsBool(doc: Json) -> bool?;
+pub method(Json) AsBool() -> bool?;
 
 /**
  * @brief Read a string from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsStr(doc: Json) -> string?;
+pub method(Json) AsStr() -> string?;
 
 /**
  * @brief Read an object from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsObject(doc: Json) -> JsonObject?;
+pub method(Json) AsObject() -> JsonObject?;
 
 /**
  * @brief Read an array from the document node.
  * @returns The matching payload, or nil when the node cannot be represented by that accessor.
  */
-pub func JsonAsArray(doc: Json) -> JsonArray?;
+pub method(Json) AsArray() -> JsonArray?;
 
 /**
  * @brief Test whether a document node holds the null variant.
  * @returns True only for JsonNull; false for every other variant.
  */
-pub func JsonIsNull(doc: Json) -> bool;
+pub method(Json) IsNull() -> bool;
 
 /**
  * @brief Construct scalar / collection nodes without cross-package `.node` field access.
@@ -424,48 +424,48 @@ pub func JsonIsNull(doc: Json) -> bool;
  * @note Callers outside package `json` should use these (or `JsonWriter`) rather than `Json{
  *   node: … }` literals — host codegen NY6002 on `.node` in large importers.
  */
-pub func JsonFromBool(v: bool) -> Json;
+pub static method(Json) FromBool(v: bool) -> Json;
 
 /**
  * @brief Construct a signed integer document node.
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromInt(v: int64) -> Json;
+pub static method(Json) FromInt(v: int64) -> Json;
 
 /**
  * @brief Construct a unsigned integer document node.
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromUInt64(v: uint64) -> Json;
+pub static method(Json) FromUInt64(v: uint64) -> Json;
 
 /**
  * @brief Construct an exact number node without rounding the original spelling.
  * @returns A retained numeric lexeme, or nil when raw is not valid JSON number syntax.
  */
-pub func JsonFromNumber(raw: string) -> Json?;
+pub static method(Json) FromNumber(raw: string) -> Json?;
 
 /**
  * @brief Construct a string document node.
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromStr(s: string) -> Json;
+pub static method(Json) FromStr(s: string) -> Json;
 
 /**
  * @brief Construct a array document node.
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromArray(items: Array<Json>) -> Json;
+pub static method(Json) FromArray(items: Array<Json>) -> Json;
 
 /**
  * @brief Construct a object document node.
  * @returns A document value retaining its scalar or collection payload through normal language
  *   ownership.
  */
-pub func JsonFromObject(entries: Array<JsonObjectEntry>) -> Json;
+pub static method(Json) FromObject(entries: Array<JsonObjectEntry>) -> Json;
 
 /**
  * @brief 1-based line (0 for I/O errors).
@@ -490,4 +490,4 @@ pub method(JsonError) Message() -> string;
  * @returns True when node kinds and their recursive contents match.
  * @note Existing comparison entry retained when implementation modules were separated.
  */
-pub func JsonTreesEqual(a: Json, b: Json) -> bool;
+pub method(Json) Equals(b: Json) -> bool;

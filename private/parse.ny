@@ -35,7 +35,7 @@ struct JsonParseCtx {
   aborted: bool;
 }
 
-func json_hex_digit(b: int32) -> int32 {
+static method(JsonParseCtx) HexDigit(b: int32) -> int32 {
   if (b >= 48) && (b <= 57) {
     return b - 48;
   }
@@ -52,11 +52,11 @@ func json_hex_digit(b: int32) -> int32 {
 }
 
 // Accumulate magnitude with overflow checks so the signed minimum is accepted without overflowing an intermediate.
-func json_parse_i64(s: string) -> JsonI64Parse {
+static method(JsonI64Parse) Parse(s: string) -> JsonI64Parse {
   // Note: do not use uint64 literal 2^63 in `/` or comparisons — host-nyra may
   // lower those as signed int64, so `0 > (INT64_MIN/10)` rejects all negatives.
   // Overflow checks stay in the positive int64 range (INT64_MAX / 10).
-  var out: JsonI64Parse = JsonI64Parse{value: 0 as int64, ok: false};
+  var out: JsonI64Parse = JsonI64Parse{value: 0i64, ok: false};
   let n: int32 = s.length;
   if n <= 0 {
     return out;
@@ -64,7 +64,7 @@ func json_parse_i64(s: string) -> JsonI64Parse {
 
   var i: int32 = 0;
   var neg: bool = false;
-  if JsonByteAt(s, 0) == 45 {
+  if s.ByteAt(0) == 45 {
     neg = true;
     i = 1;
     if n == 1 {
@@ -73,19 +73,19 @@ func json_parse_i64(s: string) -> JsonI64Parse {
   }
 
   // Reject leading zeros (JSON): "0" / "-0" ok; "01" / "-01" not.
-  if JsonByteAt(s, i) == 48 {
+  if s.ByteAt(i) == 48 {
     if (i + 1) < n {
       return out;
     }
   }
 
-  var mag: uint64 = 0u64;
-  let ten: uint64 = 10u64;
+  var mag: uint64 = 0;
+  let ten: uint64 = 10;
   // 9223372036854775807 / 10 — fits positive int64 (safe under signed lowering).
   let lim_div: uint64 = 922337203685477580u64;
   var any: bool = false;
   while i < n {
-    let b: int32 = JsonByteAt(s, i);
+    let b: int32 = s.ByteAt(i);
     if (b < 48) || (b > 57) {
       return out;
     }
@@ -111,7 +111,7 @@ func json_parse_i64(s: string) -> JsonI64Parse {
         }
 
         out.ok = true;
-        out.value = (0 as int64) - (9223372036854775807 as int64) - (1 as int64);
+        out.value = kInt64Min;
 
         return out;
       }
@@ -128,7 +128,7 @@ func json_parse_i64(s: string) -> JsonI64Parse {
 
   out.ok = true;
   if neg {
-    out.value = (0 as int64) - (mag as int64);
+    out.value = (0i64) - (mag as int64);
 
     return out;
   }
@@ -139,22 +139,22 @@ func json_parse_i64(s: string) -> JsonI64Parse {
 }
 
 // Check each digit before multiplication; an out-of-range integer must retain its exact numeric spelling elsewhere.
-func json_parse_u64(s: string) -> JsonU64Parse {
+static method(JsonU64Parse) Parse(s: string) -> JsonU64Parse {
   var out: JsonU64Parse = JsonU64Parse{value: 0u64, ok: false};
   let n: int32 = s.length;
-  if n <= 0 || JsonByteAt(s, 0) == 45 {
+  if n <= 0 || s.ByteAt(0) == 45 {
     return out;
   }
 
-  if JsonByteAt(s, 0) == 48 && n > 1 {
+  if s.ByteAt(0) == 48 && n > 1 {
     return out;
   }
 
   let limit_div: uint64 = 1844674407370955161u64;
-  var magnitude: uint64 = 0u64;
+  var magnitude: uint64 = 0;
   var i: int32 = 0;
   while i < n {
-    let byte: int32 = JsonByteAt(s, i);
+    let byte: int32 = s.ByteAt(i);
     if byte < 48 || byte > 57 {
       return out;
     }
@@ -174,7 +174,7 @@ func json_parse_u64(s: string) -> JsonU64Parse {
   return out;
 }
 
-func json_keys_has(keys: *mut Array<string>, key: string) -> bool {
+static method(JsonParseCtx) HasKey(keys: *mut Array<string>, key: string) -> bool {
   unsafe {
     let n: int32 = (*keys).Len();
     var i: int32 = 0;
@@ -203,7 +203,7 @@ method(JsonParseCtx) FailAt(line: int32, column: int32, message: string) -> void
   self.failed = true;
   self.err_line = line;
   self.err_column = column;
-  self.err_message = JsonCopyStr(message);
+  self.err_message = copy(message);
 }
 
 method(JsonParseCtx) FailHere(message: string) -> void {
@@ -215,7 +215,7 @@ method(JsonParseCtx) Peek() -> int32 {
     return -1;
   }
 
-  return JsonByteAt(self.Src(), self.pos);
+  return (self.Src()).ByteAt(self.pos);
 }
 
 method(JsonParseCtx) Advance() -> void {
@@ -223,7 +223,7 @@ method(JsonParseCtx) Advance() -> void {
     return;
   }
 
-  let b: int32 = JsonByteAt(self.Src(), self.pos);
+  let b: int32 = (self.Src()).ByteAt(self.pos);
   self.pos = self.pos + 1;
   if b == 10 {
     self.line = self.line + 1;
@@ -257,7 +257,7 @@ method(JsonParseCtx) MatchLit(lit: string) -> bool {
 
   var i: int32 = 0;
   while i < n {
-    if JsonByteAt(s, self.pos + i) != JsonByteAt(lit, i) {
+    if s.ByteAt(self.pos + i) != lit.ByteAt(i) {
       return false;
     }
 
@@ -274,7 +274,8 @@ method(JsonParseCtx) MatchLit(lit: string) -> bool {
 }
 
 method(JsonParseCtx) PublishString(heap_s: string) -> bool {
-  let view: string = JsonScratchCopy(self.scratch, heap_s);
+  let copied_view: string? = (self.scratch).CopyStringView(heap_s);
+  let view: string = copied_view != nil ? copied_view as string : "";
   if (heap_s.length > 0) && (view.length <= 0) {
     self.FailHere("scratch allocator exhausted");
 
@@ -292,7 +293,8 @@ method(JsonParseCtx) PublishString(heap_s: string) -> bool {
 }
 
 method(JsonParseCtx) PublishKey(heap_s: string) -> bool {
-  let view: string = JsonScratchCopy(self.scratch, heap_s);
+  let copied_view: string? = (self.scratch).CopyStringView(heap_s);
+  let view: string = copied_view != nil ? copied_view as string : "";
   if (heap_s.length > 0) && (view.length <= 0) {
     self.FailHere("scratch allocator exhausted");
 
@@ -314,7 +316,7 @@ method(JsonParseCtx) ReadUXXXX() -> int32 {
   var h: int32 = 0;
   while h < 4 {
     let b: int32 = self.Peek();
-    let hv: int32 = json_hex_digit(b);
+    let hv: int32 = JsonParseCtx.HexDigit(b);
     if hv < 0 {
       self.FailHere("invalid Unicode escape in string");
 
@@ -333,7 +335,7 @@ method(JsonParseCtx) ParseStringRaw() -> string {
   if self.Peek() != 34 {
     self.FailHere("expected string");
 
-    return JsonEmptyStr();
+    return "";
   }
 
   self.Advance();
@@ -344,7 +346,7 @@ method(JsonParseCtx) ParseStringRaw() -> string {
       buf.Destroy();
       self.FailHere("unterminated string");
 
-      return JsonEmptyStr();
+      return "";
     }
 
     if b == 34 {
@@ -357,7 +359,7 @@ method(JsonParseCtx) ParseStringRaw() -> string {
       buf.Destroy();
       self.FailHere("unescaped control character in string");
 
-      return JsonEmptyStr();
+      return "";
     }
 
     if b == 92 {
@@ -367,7 +369,7 @@ method(JsonParseCtx) ParseStringRaw() -> string {
         buf.Destroy();
         self.FailHere("invalid escape in string");
 
-        return JsonEmptyStr();
+        return "";
       }
 
       self.Advance();
@@ -387,12 +389,12 @@ method(JsonParseCtx) ParseStringRaw() -> string {
       }
 
       if e == 98 {
-        buf.Append(JsonUtf8Cp(8));
+        buf.Append(string.Utf8Encode(8));
         continue;
       }
 
       if e == 102 {
-        buf.Append(JsonUtf8Cp(12));
+        buf.Append(string.Utf8Encode(12));
         continue;
       }
 
@@ -416,7 +418,7 @@ method(JsonParseCtx) ParseStringRaw() -> string {
         if self.failed {
           buf.Destroy();
 
-          return JsonEmptyStr();
+          return "";
         }
 
         // Surrogate pair: high + \u low → astral scalar.
@@ -429,50 +431,50 @@ method(JsonParseCtx) ParseStringRaw() -> string {
               if self.failed {
                 buf.Destroy();
 
-                return JsonEmptyStr();
+                return "";
               }
 
               if (lo >= 56320) && (lo <= 57343) {
                 let hi: int32 = cu - 55296;
                 let low: int32 = lo - 56320;
                 let cp: int32 = 65536 + (hi * 1024) + low;
-                buf.Append(JsonUtf8Cp(cp));
+                buf.Append(string.Utf8Encode(cp));
                 continue;
               }
 
               buf.Destroy();
               self.FailHere("invalid Unicode surrogate pair in string");
 
-              return JsonEmptyStr();
+              return "";
             }
 
             buf.Destroy();
             self.FailHere("invalid Unicode surrogate pair in string");
 
-            return JsonEmptyStr();
+            return "";
           }
 
           buf.Destroy();
           self.FailHere("invalid Unicode surrogate pair in string");
 
-          return JsonEmptyStr();
+          return "";
         }
 
         if (cu >= 56320) && (cu <= 57343) {
           buf.Destroy();
           self.FailHere("invalid Unicode surrogate pair in string");
 
-          return JsonEmptyStr();
+          return "";
         }
 
-        buf.Append(JsonUtf8Cp(cu));
+        buf.Append(string.Utf8Encode(cu));
         continue;
       }
 
       buf.Destroy();
       self.FailHere("invalid escape in string");
 
-      return JsonEmptyStr();
+      return "";
     }
 
     let s: string = self.Src();
@@ -481,7 +483,7 @@ method(JsonParseCtx) ParseStringRaw() -> string {
       buf.Destroy();
       self.FailHere("invalid UTF-8 in JSON string");
 
-      return JsonEmptyStr();
+      return "";
     }
 
     let nch: int32 = decoded.byte_len;
@@ -576,7 +578,8 @@ method(JsonParseCtx) ParseNumber() -> bool {
 
   let lex: string = self.Src().Slice(start, self.pos);
   if is_decimal {
-    let raw: string = JsonScratchCopy(self.scratch, lex);
+    let copied_raw: string? = (self.scratch).CopyStringView(lex);
+    let raw: string = copied_raw != nil ? copied_raw as string : "";
     if raw.length != lex.length {
       self.FailAt(start_line, start_col, "scratch allocator exhausted");
 
@@ -593,7 +596,7 @@ method(JsonParseCtx) ParseNumber() -> bool {
     return true;
   }
 
-  let parsed: JsonI64Parse = json_parse_i64(lex);
+  let parsed: JsonI64Parse = JsonI64Parse.Parse(lex);
   if parsed.ok {
     if !self.handler.Int64(parsed.value) {
       self.aborted = true;
@@ -605,9 +608,10 @@ method(JsonParseCtx) ParseNumber() -> bool {
     return true;
   }
 
-  let unsigned: JsonU64Parse = json_parse_u64(lex);
+  let unsigned: JsonU64Parse = JsonU64Parse.Parse(lex);
   if !unsigned.ok {
-    let raw: string = JsonScratchCopy(self.scratch, lex);
+    let copied_raw: string? = (self.scratch).CopyStringView(lex);
+    let raw: string = copied_raw != nil ? copied_raw as string : "";
     if raw.length != lex.length {
       self.FailAt(start_line, start_col, "scratch allocator exhausted");
 
@@ -680,7 +684,7 @@ method(JsonParseCtx) ParseObject() -> bool {
     }
 
     let kp: *mut Array<string> = cast<Array<string>>.pointer(&mut keys);
-    if json_keys_has(kp, key_heap) {
+    if JsonParseCtx.HasKey(kp, key_heap) {
       self.FailAt(key_line, key_col, "duplicate object key");
 
       return false;
@@ -890,11 +894,11 @@ method(JsonParseCtx) ParseValue() -> bool {
 /**
  * @brief Drive `handler` for one JSON value in `text`; Key/String temps on `scratch`.
  */
-func json_sax_parse(text: string, handler: JsonHandler, scratch: Allocator) -> Result<Unit, JsonError> {
+static method(JsonParseCtx) Parse(text: string, handler: JsonHandler, scratch: Allocator) -> Result<Unit, JsonError> {
   // Touch scratch up front so MemStack/MemArena wiring is exercised even for tiny inputs.
-  let frame: *mut uint8 = scratch.Alloc(1 as uintptr);
+  let frame: *mut uint8 = scratch.Alloc(1up);
   if frame == (ptr<uint8>.null()) {
-    let err: JsonError = JsonError{line: 1, column: 1, message: JsonCopyStr("scratch allocator exhausted")};
+    let err: JsonError = JsonError{line: 1, column: 1, message: copy("scratch allocator exhausted")};
     let r: Result<Unit, JsonError> = err;
 
     return r;
@@ -911,13 +915,13 @@ func json_sax_parse(text: string, handler: JsonHandler, scratch: Allocator) -> R
     failed: false,
     err_line: 1,
     err_column: 1,
-    err_message: JsonEmptyStr(),
+    err_message: "",
     aborted: false
   };
 
   ctx.SkipWs();
   if ctx.Peek() < 0 {
-    let err: JsonError = JsonError{line: 1, column: 1, message: JsonCopyStr("empty input")};
+    let err: JsonError = JsonError{line: 1, column: 1, message: copy("empty input")};
     let r: Result<Unit, JsonError> = err;
 
     return r;
@@ -927,7 +931,7 @@ func json_sax_parse(text: string, handler: JsonHandler, scratch: Allocator) -> R
     let err: JsonError = JsonError{
       line: ctx.err_line,
       column: ctx.err_column,
-      message: JsonCopyStr(ctx.err_message)
+      message: copy(ctx.err_message)
     };
     let r: Result<Unit, JsonError> = err;
 
@@ -939,7 +943,7 @@ func json_sax_parse(text: string, handler: JsonHandler, scratch: Allocator) -> R
     let err: JsonError = JsonError{
       line: ctx.line,
       column: ctx.column,
-      message: JsonCopyStr("trailing junk after value")
+      message: copy("trailing junk after value")
     };
     let r: Result<Unit, JsonError> = err;
 
