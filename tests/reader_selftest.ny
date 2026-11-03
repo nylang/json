@@ -79,12 +79,14 @@ method(JsonEvState) PushKind(k: int32) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) Null() -> bool {
   unsafe {
     return (*self.st).PushKind(kJsonEvNull);
   }
 }
 
+@override
 method(JsonEventRecorder) Bool(b: bool) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvBool) {
@@ -103,6 +105,7 @@ method(JsonEventRecorder) Bool(b: bool) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) Int64(v: int64) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvInt64) {
@@ -117,6 +120,7 @@ method(JsonEventRecorder) Int64(v: int64) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) UInt64(v: uint64) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvUInt64) {
@@ -131,6 +135,7 @@ method(JsonEventRecorder) UInt64(v: uint64) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) Number(raw: string) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvNumber) {
@@ -145,6 +150,7 @@ method(JsonEventRecorder) Number(raw: string) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) String(s: string) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvString) {
@@ -159,12 +165,14 @@ method(JsonEventRecorder) String(s: string) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) StartObject() -> bool {
   unsafe {
     return (*self.st).PushKind(kJsonEvStartObject);
   }
 }
 
+@override
 method(JsonEventRecorder) Key(k: string) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvKey) {
@@ -179,6 +187,7 @@ method(JsonEventRecorder) Key(k: string) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) EndObject(member_count: int32) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvEndObject) {
@@ -193,12 +202,14 @@ method(JsonEventRecorder) EndObject(member_count: int32) -> bool {
   }
 }
 
+@override
 method(JsonEventRecorder) StartArray() -> bool {
   unsafe {
     return (*self.st).PushKind(kJsonEvStartArray);
   }
 }
 
+@override
 method(JsonEventRecorder) EndArray(element_count: int32) -> bool {
   unsafe {
     if !(*self.st).PushKind(kJsonEvEndArray) {

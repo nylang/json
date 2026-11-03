@@ -484,30 +484,35 @@ method(JsonDomState) EndArray() -> bool {
   }
 }
 
+@override
 method(JsonDomBuilder) Null() -> bool {
   unsafe {
     return (*self.st).AddValue(Json{node: JsonNull{_pad: 0}});
   }
 }
 
+@override
 method(JsonDomBuilder) Bool(b: bool) -> bool {
   unsafe {
     return (*self.st).AddValue(Json.FromBool(b));
   }
 }
 
+@override
 method(JsonDomBuilder) Int64(v: int64) -> bool {
   unsafe {
     return (*self.st).AddValue(Json.FromInt(v));
   }
 }
 
+@override
 method(JsonDomBuilder) UInt64(v: uint64) -> bool {
   unsafe {
     return (*self.st).AddValue(Json.FromUInt64(v));
   }
 }
 
+@override
 method(JsonDomBuilder) Number(raw: string) -> bool {
   unsafe {
     if !JsonNumber.IsValid(raw) {
@@ -527,6 +532,7 @@ method(JsonDomBuilder) Number(raw: string) -> bool {
     }
 }
 
+@override
 method(JsonDomBuilder) String(s: string) -> bool {
   unsafe {
     let heap_s: string = (*self.st).CopyDurable(s);
@@ -540,12 +546,14 @@ method(JsonDomBuilder) String(s: string) -> bool {
     }
 }
 
+@override
 method(JsonDomBuilder) StartObject() -> bool {
   unsafe {
     return (*self.st).PushObject();
   }
 }
 
+@override
 method(JsonDomBuilder) Key(k: string) -> bool {
   unsafe {
     let fp: *mut JsonDomFrame = (*self.st).top;
@@ -581,6 +589,7 @@ method(JsonDomBuilder) Key(k: string) -> bool {
   }
 }
 
+@override
 method(JsonDomBuilder) EndObject(member_count: int32) -> bool {
   unsafe {
     let _mc: int32 = member_count;
@@ -589,12 +598,14 @@ method(JsonDomBuilder) EndObject(member_count: int32) -> bool {
   }
 }
 
+@override
 method(JsonDomBuilder) StartArray() -> bool {
   unsafe {
     return (*self.st).PushArray();
   }
 }
 
+@override
 method(JsonDomBuilder) EndArray(element_count: int32) -> bool {
   unsafe {
     let _ec: int32 = element_count;
