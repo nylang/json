@@ -40,11 +40,11 @@ func test_json_emit_empty_collections_and_null() {
   let nt: string = JsonWriter.Emit(n);
   AssertEqString(nt, "null");
   n.AssertRoundTrip();
-  let empty_obj: Json = Json{node: JsonObject{entries: Array<JsonObjectEntry>{}}};
+  let empty_obj: Json = Json{node: JsonObject{entries: Array<JsonObjectEntry>.New()}};
   let mt: string = JsonWriter.Emit(empty_obj);
   AssertEqString(mt, "{}");
   empty_obj.AssertRoundTrip();
-  let empty_arr: Json = Json{node: JsonArray{items: Array<Json>{}}};
+  let empty_arr: Json = Json{node: JsonArray{items: Array<Json>.New()}};
   let st: string = JsonWriter.Emit(empty_arr);
   AssertEqString(st, "[]");
   empty_arr.AssertRoundTrip();

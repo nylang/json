@@ -55,12 +55,12 @@ struct JsonEventRecorder implements JsonHandler {
 
 static method(JsonEvState) New() -> JsonEvState {
   return JsonEvState{
-    kinds: Array<int32>{},
-    bools: Array<int32>{},
-    ints: Array<int64>{},
-    uints: Array<uint64>{},
-    strings: Array<string>{},
-    counts: Array<int32>{},
+    kinds: Array<int32>.New(),
+    bools: Array<int32>.New(),
+    ints: Array<int64>.New(),
+    uints: Array<uint64>.New(),
+    strings: Array<string>.New(),
+    counts: Array<int32>.New(),
     abort_at: -1,
     seen: 0
   };

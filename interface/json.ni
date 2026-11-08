@@ -121,12 +121,11 @@ pub method(JsonDocument) Root() -> Json;
  * @note Handler methods are on the product face; private shell rebuilds via DomBuilder for
  *   `Accept` (host-nyra pub-struct `implements` itable edge — DomBuilder peer).
  */
-pub struct JsonWriter {
-  st: *mut int8;
-}
+pub struct JsonWriter;
 
 /**
- * @brief Construct an empty Writer (Handler state on the heap).
+ * @brief Construct an empty writer sharing language-owned DOM state.
+ * @note Copies share events; the last owner releases complete or partial DOM state.
  * @returns The JsonWriter value described above, retaining the documented ownership and
  *   default-state semantics.
  */

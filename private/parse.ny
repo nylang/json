@@ -666,7 +666,7 @@ method(JsonParseCtx) ParseObject() -> bool {
     return true;
   }
 
-  var keys: Array<string> = Array<string>{};
+  var keys: Array<string> = Array<string>.New();
   var count: int32 = 0;
   while true {
     self.SkipWs();

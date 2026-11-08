@@ -18,7 +18,7 @@ part of JsonDom;
  *   `Accept` (host-nyra pub-struct `implements` itable edge — DomBuilder peer).
  */
 pub struct JsonWriter {
-  st: *mut int8;
+  state: rc<JsonDomState>?;
 }
 
 /**
@@ -294,28 +294,30 @@ pub method(Json) Accept(handler: JsonHandler) -> bool {
  *   default-state semantics.
  */
 pub static method(JsonWriter) New() -> JsonWriter {
-  // Heap shell for JsonDomState (peer yaml Writer.New 1024; keep headroom for Json root).
-  let nbytes: int64 = 4096;
-  let raw: *mut int8 = _nyra_malloc(nbytes, 8i64);
-  if raw == (ptr<int8>.null()) {
-    return JsonWriter{st: ptr<int8>.null()};
+  return JsonWriter{
+    state: new rc<JsonDomState>{
+      durable: Allocator.ProcessHeap(0i64, 8i64),
+      top: ptr<JsonDomFrame>.null(),
+      depth: 0,
+      root: Json{node: JsonNull{_pad: 0}},
+      has_root: false,
+      failed: false
+    }
+  };
+}
+
+// Borrow only while this writer retains the shared state. Copies share events
+// and the final language RC release destroys both complete and partial DOMs.
+method(JsonWriter) State() -> *mut JsonDomState {
+  if self.state == nil {
+    return ptr<JsonDomState>.null();
   }
 
-  // Field assignment releases prior owned values. Establish an empty state
-  // before assigning into freshly allocated, potentially recycled bytes.
-  memset(raw as *mut uint8, 0u8, nbytes as uintptr);
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(raw);
-  var durable: Allocator = Allocator.ProcessHeap(0i64, 8i64);
   unsafe {
-    (*sp).durable = durable;
-    (*sp).top = ptr<JsonDomFrame>.null();
-    (*sp).depth = 0;
-    (*sp).root = Json{node: JsonNull{_pad: 0}};
-    (*sp).has_root = false;
-    (*sp).failed = false;
-  }
+    let state: rc<JsonDomState> = self.state as rc<JsonDomState>;
 
-  return JsonWriter{st: raw};
+    return state as *mut JsonDomState;
+  }
 }
 
 /**
@@ -323,12 +325,12 @@ pub static method(JsonWriter) New() -> JsonWriter {
  * @returns UTF-8 JSON text accumulated from Handler events / `Accept`.
  */
 pub method(JsonWriter) GetString() -> string {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return copy("null");
   }
 
   unsafe {
-    let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+    let sp: *mut JsonDomState = self.State();
     if (*sp).failed || ! (*sp).has_root {
       return copy("null");
     }
@@ -347,11 +349,11 @@ pub method(JsonWriter) GetString() -> string {
  */
 pub static method(JsonWriter) Emit(node: Json) -> string {
   var w: JsonWriter = JsonWriter.New();
-  if w.st == (ptr<int8>.null()) {
+  if w.state == nil {
     return copy("null");
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(w.st);
+  let sp: *mut JsonDomState = w.State();
   var builder: JsonDomBuilder = JsonDomBuilder{st: sp};
   let ok: bool = node.Accept(builder);
   if !ok {
@@ -367,11 +369,11 @@ pub static method(JsonWriter) Emit(node: Json) -> string {
  *   event/build failure.
  */
 pub method(JsonWriter) Null() -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).AddValue(Json{node: JsonNull{_pad: 0}});
@@ -384,11 +386,11 @@ pub method(JsonWriter) Null() -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) Bool(b: bool) -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).AddValue(Json.FromBool(b));
@@ -401,11 +403,11 @@ pub method(JsonWriter) Bool(b: bool) -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) Int64(v: int64) -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).AddValue(Json.FromInt(v));
@@ -418,11 +420,11 @@ pub method(JsonWriter) Int64(v: int64) -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) UInt64(v: uint64) -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).AddValue(Json.FromUInt64(v));
@@ -435,11 +437,11 @@ pub method(JsonWriter) UInt64(v: uint64) -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) Number(raw: string) -> bool {
-  if self.st == (ptr<int8>.null()) || !JsonNumber.IsValid(raw) {
+  if self.state == nil || !JsonNumber.IsValid(raw) {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
   unsafe {
     let heap_raw: string = (*sp).CopyDurable(raw);
     if (raw.length > 0) && (heap_raw.length <= 0) {
@@ -458,11 +460,11 @@ pub method(JsonWriter) Number(raw: string) -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) String(s: string) -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
   unsafe {
     let heap_s: string = (*sp).CopyDurable(s);
     if (s.length > 0) && (heap_s.length <= 0) {
@@ -481,11 +483,11 @@ pub method(JsonWriter) String(s: string) -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) StartObject() -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).PushObject();
@@ -498,11 +500,11 @@ pub method(JsonWriter) StartObject() -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) Key(k: string) -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
   unsafe {
     let fp: *mut JsonDomFrame = (*sp).top;
     if fp == (ptr<JsonDomFrame>.null()) {
@@ -538,11 +540,11 @@ pub method(JsonWriter) Key(k: string) -> bool {
  */
 pub method(JsonWriter) EndObject(member_count: int32) -> bool {
   let _mc: int32 = member_count;
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).EndObject();
@@ -555,11 +557,11 @@ pub method(JsonWriter) EndObject(member_count: int32) -> bool {
  *   event/build failure.
  */
 pub method(JsonWriter) StartArray() -> bool {
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).PushArray();
@@ -573,11 +575,11 @@ pub method(JsonWriter) StartArray() -> bool {
  */
 pub method(JsonWriter) EndArray(element_count: int32) -> bool {
   let _ec: int32 = element_count;
-  if self.st == (ptr<int8>.null()) {
+  if self.state == nil {
     return false;
   }
 
-  let sp: *mut JsonDomState = cast<JsonDomState>.pointer(self.st);
+  let sp: *mut JsonDomState = self.State();
 
   unsafe {
     return (*sp).EndArray();

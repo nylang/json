@@ -343,8 +343,8 @@ static method(JsonDomFrame) Release(fp: *mut JsonDomFrame) -> void {
 
   unsafe {
     (*fp).pending_key = "";
-    (*fp).object = JsonObject{entries: Array<JsonObjectEntry>{}};
-    (*fp).array = JsonArray{items: Array<Json>{}};
+    (*fp).object = JsonObject{entries: Array<JsonObjectEntry>.New()};
+    (*fp).array = JsonArray{items: Array<Json>.New()};
     (*fp).prev = ptr<JsonDomFrame>.null();
   }
 
@@ -363,6 +363,12 @@ method(JsonDomState) ClearStack() -> void {
     self.top = ptr<JsonDomFrame>.null();
     self.depth = 0;
   }
+}
+
+// Frame pointers are internal construction scratch. Managed fields, including
+// the completed root, are dropped automatically after this destructor.
+method(JsonDomState) operator drop() -> void {
+  self.ClearStack();
 }
 
 method(JsonDomState) PushObject() -> bool {
@@ -449,7 +455,7 @@ method(JsonDomState) EndObject() -> bool {
 
     let object: JsonObject = move((*fp).object);
     let node: Json = Json{node: move(object)};
-    (*fp).object = JsonObject{entries: Array<JsonObjectEntry>{}};
+    (*fp).object = JsonObject{entries: Array<JsonObjectEntry>.New()};
     self.top = (*fp).prev;
     self.depth = self.depth - 1;
     JsonDomFrame.Release(fp);
@@ -475,7 +481,7 @@ method(JsonDomState) EndArray() -> bool {
 
     let items: JsonArray = move((*fp).array);
     let node: Json = Json{node: move(items)};
-    (*fp).array = JsonArray{items: Array<Json>{}};
+    (*fp).array = JsonArray{items: Array<Json>.New()};
     self.top = (*fp).prev;
     self.depth = self.depth - 1;
     JsonDomFrame.Release(fp);
