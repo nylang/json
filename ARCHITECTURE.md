@@ -18,6 +18,9 @@ The existing document layout, Handler contract and allocator lifetimes are retai
 - `private/emit.ny` defines `JsonEmitter`, owning a StringBuffer for one output.
   `Json.Equals` owns structural comparison. Emission consumes
   model values; it cannot mutate the DOM builder's frame stack.
+- `private/schema.ny` exposes `JsonSchema` and lends read-only node handles to
+  the schema package. The borrowed DOM stays live through the call. The engine
+  owns retained rules, including the exact numeric lexemes.
 
 The dependency direction is scalar/model contracts into Reader and encoding,
 then DOM orchestration into Reader and encoding operations. No private frame or

@@ -5,6 +5,14 @@ Rebuild precompiled consumers against the matching interfaces and runtime.
 
 Nyra JSON reader, document model and writer. Import `json:json.ny`.
 
+## Document validation
+
+Pass a parsed JSON rule to `JsonSchema.Compile(rule.Root())` and call
+`Validate(instance.Root())` on the returned `JsonSchema`. The compiled
+schema owns the rule data. Validation reads the original JSON DOM through
+the shared `schema` engine. Errors include the instance and rule paths.
+Use `Compiled()` and `FromCompiled` to share rules with another format.
+
 Development version: **0.20.0**. Repository: <https://github.com/nylang/json>.
 
 ## Development setup

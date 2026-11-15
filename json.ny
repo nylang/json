@@ -9,9 +9,12 @@
  * @see docs/design/stdlib/json.md
  */
 export "interface/json.ni";
+export "interface/schema.ni";
+export "schema:schema.ny";
 import "interface/json.ni";
 import "private/model.ny";
 
 import "private/reader.ny";
 import "private/document.ny";
 import "private/emit.ny";
+import "private/schema.ny";
