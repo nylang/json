@@ -5,7 +5,7 @@ license: MIT
 dependencies:
   schema:
     git: https://github.com/nylang/schema.git
-    rev: 3ac9568aef3c61c61378b020b89e774e6c6a3499
+    rev: 20ae902b0c9d934ba6a95726178156819fa8aab4
 directories:
   interface:
     - interface
